@@ -181,7 +181,7 @@
           <!-- Right: accordion list -->
           <div class="features-list-panel">
             <div class="features-list-header">
-              <p class="approach-kicker">OUR APPROACH</p>
+              <p class="approach-kicker">HOW IT WORKS</p>
               <h2>Everything thought through for your comfort and safety</h2>
             </div>
             <div class="features-list" role="list">
@@ -207,6 +207,30 @@
       </div>
     </section>
 
+    <!-- ── Explore Teaser + Card Gallery (merged into one sticky section) ──── -->
+    <section class="mel-gallery" ref="melSectionRef">
+      <div class="mel-sticky-pin">
+        <div class="mel-teaser-overlay" ref="melTeaserRef">
+          <p class="explore-kicker">MELBOURNE AWAITS</p>
+          <h2 class="explore-headline">
+            <span class="explore-line">Thinking of heading</span>
+            <span class="explore-line">outside to explore?</span>
+          </h2>
+          <p class="explore-sub">Discover your neighbourhood, one comfortable walk at a time.</p>
+        </div>
+        <div class="mel-stage" ref="melStageRef">
+          <div
+            v-for="(img, i) in melCards"
+            :key="i"
+            class="mel-card"
+            :style="{ zIndex: i + 2 }"
+          >
+            <img :src="img" :alt="`Melbourne scene ${i + 1}`" loading="lazy" />
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="section try-planner-section">
       <div class="try-planner-hero" role="region" aria-label="Try GreenPath route planner">
         <div class="try-planner-overlay"></div>
@@ -225,6 +249,18 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import mel01 from '../assets/pictures/mel01.jpg'
+import mel02 from '../assets/pictures/mel02.jpg'
+import mel03 from '../assets/pictures/mel03.jpg'
+import mel04 from '../assets/pictures/mel04.jpg'
+import mel05 from '../assets/pictures/mel05.jpg'
+import mel06 from '../assets/pictures/mel06.jpg'
+import mel07 from '../assets/pictures/mel07.jpg'
+import mel08 from '../assets/pictures/mel08.jpg'
+import mel09 from '../assets/pictures/mel09.jpg'
+import mel10 from '../assets/pictures/mel10.jpg'
+import mel11 from '../assets/pictures/mel11.jpg'
+import mel12 from '../assets/pictures/mel12.jpg'
 import featImg1 from '../assets/pictures/01.jpg'
 import featImg2 from '../assets/pictures/02.jpg'
 import featImg3 from '../assets/pictures/03.jpg'
@@ -269,6 +305,100 @@ const featureItems = [
 ]
 
 let featScrollHandler = null
+
+// ── Melbourne card gallery ────────────────────────────────────────────────────
+const exploreTeaserRef      = ref(null)  // kept to avoid breaking any other code
+const melSectionRef         = ref(null)
+const melStageRef           = ref(null)
+const melTeaserRef          = ref(null)
+let melRafId          = null
+let melScrollHandler  = null
+let melTargetProgress = 0
+let melCurrentProgress = 0
+let exploreObserver   = null
+
+const MEL_COUNT    = 12
+const MEL_LEAD     = 0.10      // dwell before cards start; text fades during this phase
+const MEL_DURATION = 0.40      // fraction of scroll each card animates over
+const MEL_STAGGER  = 0.05      // fraction between consecutive card starts
+// MEL_LEAD + (MEL_COUNT-1)*MEL_STAGGER + MEL_DURATION = 0.05 + 0.55 + 0.40 = 1.00
+// → last card finishes exactly at progress=1, zero dead scroll at gallery end
+
+// Per-card layout: finalX/Y in vw/px, finalRot in deg, launchRot (entry rotation), fold (rotateY peak)
+const melCardParams = [
+  { finalX:  2, finalY:  10, finalRot:  -6, launchRot:  18, fold:   8 },
+  { finalX:  9, finalY:  -8, finalRot:   4, launchRot: -14, fold: -12 },
+  { finalX: 17, finalY:  12, finalRot:  -9, launchRot:  22, fold:   7 },
+  { finalX: 21, finalY:  -4, finalRot:   3, launchRot: -10, fold:  -9 },
+  { finalX: 30, finalY:   8, finalRot:  -5, launchRot:  20, fold:  11 },
+  { finalX: 34, finalY: -10, finalRot:   7, launchRot: -17, fold:  -7 },
+  { finalX: 43, finalY:   6, finalRot:  -4, launchRot:  15, fold:   9 },
+  { finalX: 47, finalY:  -6, finalRot:   6, launchRot: -20, fold: -13 },
+  { finalX: 55, finalY:  10, finalRot:  -8, launchRot:  16, fold:   7 },
+  { finalX: 58, finalY:  -3, finalRot:   5, launchRot: -11, fold: -10, dur: 0.33 },
+  { finalX: 66, finalY:   7, finalRot:  -3, launchRot:  13, fold:   8, dur: 0.30 },
+  { finalX: 70, finalY:  -5, finalRot:   4, launchRot: -18, fold: -11, dur: 0.27 },
+]
+
+const melCards = [
+  mel01, mel02, mel03, mel04, mel05, mel06,
+  mel07, mel08, mel09, mel10, mel11, mel12,
+]
+
+
+
+const easeOutBack = (t) => {
+  const c1 = 1.70158, c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
+const updateMelCards = (progress) => {
+  const stage = melStageRef.value
+  if (!stage) return
+
+  const cards = stage.children
+  for (let i = 0; i < cards.length; i++) {
+    const el = cards[i]
+    const p = melCardParams[i]
+    const cStart = MEL_LEAD + i * MEL_STAGGER
+    const cProg  = Math.max(0, Math.min(1, (progress - cStart) / (p.dur ?? MEL_DURATION)))
+
+    const posT = easeOutBack(cProg)
+    const rotT = easeOutCubic(cProg)
+
+    const x   = 110 + (p.finalX - 110) * posT          // vw
+    const y   = p.finalY * rotT                         // px
+    const rot = p.launchRot + (p.finalRot - p.launchRot) * rotT
+    const fold = p.fold * Math.sin(Math.min(cProg, 1) * Math.PI)
+
+    el.style.transform = `translate(${x}vw, calc(-50% + ${y}px)) rotate(${rot}deg) rotateY(${fold}deg)`
+  }
+}
+
+// Continuous RAF loop — lerps visual progress and fades teaser text out
+const melLoopFn = () => {
+  const section = melSectionRef.value
+  if (section) {
+    const scrolled = window.scrollY - section.offsetTop
+    const range    = section.scrollHeight - window.innerHeight
+    const lastCardEnd = MEL_LEAD + (MEL_COUNT - 1) * MEL_STAGGER + (melCardParams[MEL_COUNT - 1].dur ?? MEL_DURATION)
+    const raw = Math.max(0, Math.min(1, scrolled / range))
+    melTargetProgress = Math.min(1, raw / lastCardEnd)
+  }
+
+  const lerpRate = melCurrentProgress < MEL_LEAD ? 0.07 : 0.16
+  melCurrentProgress += (melTargetProgress - melCurrentProgress) * lerpRate
+  updateMelCards(melCurrentProgress)
+
+  // Text fades out fast: starts when first card launches, gone well before it lands
+  const teaserEl = melTeaserRef.value
+  if (teaserEl) {
+    const fade = Math.max(0, Math.min(1, (melCurrentProgress - MEL_LEAD) / 0.05))
+    teaserEl.style.opacity = String(1 - fade)
+  }
+
+  melRafId = requestAnimationFrame(melLoopFn)
+}
 
 const updateActiveFeature = () => {
   const el = featSectionRef.value
@@ -392,6 +522,9 @@ onMounted(() => {
   )
 
   proofObserver.observe(proofSection)
+
+  // Mel card gallery — continuous RAF loop
+  melRafId = requestAnimationFrame(melLoopFn)
 })
 
 onBeforeUnmount(() => {
@@ -413,5 +546,8 @@ onBeforeUnmount(() => {
   proofObserver = null
   frameIds.forEach((id) => cancelAnimationFrame(id))
   frameIds = []
+  if (melRafId) { cancelAnimationFrame(melRafId); melRafId = null }
+  exploreObserver?.disconnect()
+  exploreObserver = null
 })
 </script>

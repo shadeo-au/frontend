@@ -2480,7 +2480,7 @@ h4 {
 
 .planner-result-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 1.06fr) minmax(0, 0.94fr);
   align-items: stretch;
   padding: 0;
   overflow: hidden;
@@ -2520,14 +2520,18 @@ h4 {
 
 .planner-result-content {
   padding: 1.35rem 1.25rem;
+  min-width: 0;
 }
 
 .planner-result-content h3 {
   font-family: 'Manrope', sans-serif;
-  font-size: clamp(2rem, 4vw, 3.1rem);
-  line-height: 1.06;
+  font-size: clamp(1.8rem, 3vw, 2.85rem);
+  line-height: 1.08;
   letter-spacing: -0.015em;
   color: #1a2520;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 .planner-metric-row {
@@ -2594,6 +2598,16 @@ h4 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem 1rem;
+}
+
+@media (max-width: 1380px) {
+  .planner-result-card {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-result-image-wrap {
+    max-height: 360px;
+  }
 }
 
 .planner-feature-item {
@@ -3362,3 +3376,213 @@ h4 {
     font-size: 1.15rem;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Explore Teaser Section
+═══════════════════════════════════════════════════════════════ */
+.explore-teaser-outer {
+  position: relative;
+  height: 100vh;
+  background: #071c0c;
+}
+
+.explore-teaser {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: #071c0c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+.explore-teaser-inner {
+  padding: 5rem 2.5rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.explore-kicker {
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  color: rgba(100, 220, 140, 0.55);
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 0 0 1.6rem;
+}
+
+.explore-headline {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 900;
+  line-height: 1.0;
+  color: #25f07a;
+  letter-spacing: -0.04em;
+}
+
+.explore-line {
+  display: block;
+  opacity: 0;
+  transition: opacity 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.explore-from-left  { transform: translateX(-80px); }
+.explore-from-right { transform: translateX( 80px); }
+.explore-from-left  { transition-delay: 0.08s; }
+.explore-from-right { transition-delay: 0.26s; }
+
+.explore-sub {
+  margin-top: 2.2rem;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  color: rgba(255, 255, 255, 0.38);
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.8s 0.48s, transform 0.8s 0.48s;
+}
+
+/* Triggered by IntersectionObserver adding .explore-visible */
+.explore-visible .explore-line {
+  opacity: 1;
+  transform: translateX(0);
+}
+.explore-visible .explore-sub {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Melbourne Card Gallery Section
+═══════════════════════════════════════════════════════════════ */
+.mel-gallery {
+  position: relative;
+  height: 500vh;
+  background: #071c0c;
+}
+
+.mel-sticky-pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Teaser text overlay — sits behind cards, JS drives opacity fade-out */
+.mel-teaser-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 2.5rem;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
+.mel-teaser-overlay .explore-line {
+  display: block;
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+.mel-teaser-overlay .explore-sub {
+  opacity: 0.5;
+  transform: none;
+  transition: none;
+}
+
+.explore-kicker {
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  color: rgba(100, 220, 140, 0.55);
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 0 0 1.6rem;
+}
+
+.explore-headline {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 900;
+  line-height: 1.0;
+  color: #25f07a;
+  letter-spacing: -0.04em;
+}
+
+.explore-sub {
+  margin-top: 2.2rem;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.mel-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: 900px;
+}
+
+.mel-card {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: clamp(220px, 22vw, 310px);
+  aspect-ratio: 3 / 4;
+  border-radius: 1.3rem;
+  overflow: hidden;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+  will-change: transform;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.mel-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mel-footer-text {
+  position: absolute;
+  top: 2rem;
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  white-space: nowrap;
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(1.3rem, 2.8vw, 2.1rem);
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.02em;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  z-index: 50;
+}
+
+@media (max-width: 768px) {
+  .mel-gallery { height: 500vh; }
+
+  .mel-footer-text {
+    font-size: clamp(1rem, 4.5vw, 1.4rem);
+    top: 1.4rem;
+  }
+
+  .mel-card {
+    width: clamp(140px, 28vw, 200px);
+  }
+}
+
