@@ -273,7 +273,9 @@ import walkIcon from '../assets/svg/walk.svg'
 import timeIcon from '../assets/svg/time-icon.svg'
 
 const DEFAULT_LOCATION = { lat: -37.8136, lng: 144.9631 }
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000'
+const DEFAULT_API_BASE_URL = 'https://g5m02vygkj.execute-api.ap-southeast-2.amazonaws.com'
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
+const API_BASE_URL = configuredApiBaseUrl.replace(/\/+$/, '')
 
 const destinationTypes = [
   { id: 'pharmacy', label: 'Pharmacy', icon: pharmacyIcon, image: pharmacyPic },
@@ -405,6 +407,54 @@ const clearResult = () => {
   result.route = []
 }
 
+const toFiniteNumber = (value, fallback = null) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const normalizeRoutePoint = (point) => {
+  if (!Array.isArray(point) || point.length < 2) return null
+  const lng = toFiniteNumber(point[0])
+  const lat = toFiniteNumber(point[1])
+  return lng == null || lat == null ? null : [lng, lat]
+}
+
+const normalizeDestination = (destination) => {
+  if (!destination || typeof destination !== 'object') return null
+  return {
+    ...destination,
+    lat: toFiniteNumber(destination.lat),
+    lng: toFiniteNumber(destination.lng),
+    distanceMeters: toFiniteNumber(destination.distanceMeters, 0)
+  }
+}
+
+const normalizeFacilities = (facilities) => {
+  if (!Array.isArray(facilities)) return []
+  return facilities
+    .filter((facility) => facility && typeof facility === 'object')
+    .map((facility) => ({
+      ...facility,
+      lat: toFiniteNumber(facility.lat),
+      lng: toFiniteNumber(facility.lng),
+      distanceMeters: toFiniteNumber(facility.distanceMeters, 0),
+      conditionRating: toFiniteNumber(facility.conditionRating)
+    }))
+}
+
+const normalizePlanResponse = (payload) => {
+  const normalizedRoute = Array.isArray(payload?.route)
+    ? payload.route.map(normalizeRoutePoint).filter(Boolean)
+    : []
+
+  return {
+    destination: normalizeDestination(payload?.destination),
+    route: normalizedRoute,
+    facilities: normalizeFacilities(payload?.facilities),
+    message: typeof payload?.message === 'string' ? payload.message : ''
+  }
+}
+
 const fetchJson = async (url, options = {}, timeoutMs = 20000) => {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -446,7 +496,9 @@ const requestPlan = async () => {
         })
       })
       // retry if destination found but route is empty (e.g. ORS cold-start failure)
-      const routeReady = payload?.destination && (payload.route?.length ?? 0) > 1
+      const normalizedPayload = normalizePlanResponse(payload)
+      payload = normalizedPayload
+      const routeReady = normalizedPayload.destination && normalizedPayload.route.length > 1
       if (routeReady || !payload?.destination || attempt === maxAttempts) break
       await new Promise((resolve) => setTimeout(resolve, 800))
     }

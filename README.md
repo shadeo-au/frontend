@@ -40,6 +40,20 @@ The Vite dev server is configured to run on:
 http://localhost:5173
 ```
 
+### Backend API base URL
+
+The planner uses this backend API by default:
+
+```text
+https://g5m02vygkj.execute-api.ap-southeast-2.amazonaws.com
+```
+
+If you need to point the frontend to another backend, create a `.env.local` file in the `frontend` folder:
+
+```bash
+VITE_API_BASE_URL=https://your-backend-base-url
+```
+
 ### Build for production
 
 ```bash
