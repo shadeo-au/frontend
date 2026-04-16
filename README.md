@@ -6,6 +6,7 @@ GreenPath is a Vue 3 + Vite frontend focused on helping older adults plan walkin
 
 - Vue 3
 - Vite 5
+- Vue Router 4
 - Leaflet
 - Plain CSS
 
@@ -72,11 +73,14 @@ npm run preview
 frontend/
 	index.html
 	package.json
+	vercel.json
 	vite.config.js
 	public/
 	src/
 		App.vue
 		main.js
+		router/
+			index.js
 		styles.css
 		assets/
 			pictures/
@@ -85,6 +89,7 @@ frontend/
 			AppFooter.vue
 			AppHeader.vue
 		pages/
+			AccessGatePage.vue
 			HomePage.vue
 			PlannerPage.vue
 			WhyWalkPage.vue
@@ -92,13 +97,27 @@ frontend/
 
 ## Routing
 
-This frontend uses simple hash-based routing implemented inside `App.vue`.
+This frontend uses `vue-router` with HTML5 history mode.
 
-- `#/` -> Home page
-- `#/why-walk` -> Why Walk page
-- `#/planner` -> Route planner
+- `/` -> Home page
+- `/why-walk` -> Why Walk page
+- `/planner` -> Route planner
+- `/unlock` -> Password gate page
 
-This keeps the project lightweight and avoids adding Vue Router for a small single-page experience.
+The router also owns the site access guard. Protected routes redirect unauthenticated users to `/unlock`, then return them to the requested route after a successful password check.
+
+Because the app uses history mode, direct visits and refreshes on nested routes require SPA rewrites in production.
+
+## Vercel Deployment
+
+This project is configured for Vercel with [vercel.json](f:\FIT5120\GreenPath\frontend\vercel.json), which rewrites all requests to `index.html` so history-mode routes work correctly.
+
+Recommended Vercel setup:
+
+1. Set the project root directory to `frontend`.
+2. Use the default build command: `npm run build`.
+3. Use the default output directory: `dist`.
+4. If you want to change the site password without editing code, add `VITE_SITE_PASSWORD_HASH` in the Vercel environment variables.
 
 ## Planner Notes
 
@@ -110,6 +129,7 @@ This keeps the project lightweight and avoids adding Vue Router for a small sing
 
 - Global styles live in `src/styles.css`.
 - Shared layout is managed in `src/App.vue`.
+- Application routing and route guards live in `src/router/index.js`.
 - Reusable header and footer components are stored in `src/components`.
 - Page-level logic is kept inside `src/pages`.
 
@@ -128,7 +148,9 @@ This keeps the project lightweight and avoids adding Vue Router for a small sing
 
 If you are continuing this project, start with these files:
 
-- `src/App.vue` for top-level page switching.
+- `src/App.vue` for the shared application shell.
+- `src/router/index.js` for route definitions and the password guard.
+- `src/pages/AccessGatePage.vue` for the unlock flow.
 - `src/pages/HomePage.vue` for landing page content.
 - `src/pages/PlannerPage.vue` for route planner logic and map rendering.
 - `src/styles.css` for the main visual system.
