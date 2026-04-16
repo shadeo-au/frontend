@@ -3,25 +3,144 @@
     <div class="planner-scene" aria-hidden="true"></div>
     <div class="planner-scene-overlay" aria-hidden="true"></div>
 
+    <div
+      v-if="showPlannerIntro"
+      class="planner-intro-backdrop"
+      role="presentation"
+      @click.self="showPlannerIntro = false"
+    >
+      <section
+        class="planner-intro-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="planner-intro-title"
+      >
+        <button class="planner-intro-close" type="button" aria-label="Close planner introduction" @click="showPlannerIntro = false">
+          ×
+        </button>
+        <p class="planner-intro-kicker">WELCOME TO GREENPATH</p>
+        <h2 id="planner-intro-title">GreenPath supports safer everyday travel for older adults.</h2>
+        <p class="planner-intro-copy">
+          This planner is designed to help older adults make comfortable and confident daily trips, not just the shortest ones.
+        </p>
+
+        <ol class="planner-intro-points">
+          <li>Choose the type of destination you want to visit.</li>
+          <li>
+            We will recommend one <strong class="planner-intro-highlight">unique</strong> destination.
+            Distance is not our only priority. We also consider comfort, cooler walking conditions,
+            nearby rest facilities, and access to public toilets.
+          </li>
+        </ol>
+
+        <p class="planner-intro-warning">
+          GreenPath currently supports Central Melbourne only: CBD, Docklands, Southbank, Kensington,
+          North Melbourne, West Melbourne, East Melbourne, Parkville, Carlton, and South Yarra.
+        </p>
+
+        <button class="btn btn-primary planner-intro-action" type="button" @click="showPlannerIntro = false">
+          Start Planning
+        </button>
+      </section>
+    </div>
+
     <section class="planner-shell" v-if="!isRouteView">
-      <article class="planner-card planner-start-card">
-        <h1>Let's start your journey</h1>
-        <p class="planner-start-label">Starting from</p>
-        <div class="planner-location-row">
-          <div class="planner-location-chip">
-            <img class="planner-location-icon" :src="locationIcon" alt="" aria-hidden="true" />
-            <div>
-              <strong>{{ locationLabel }}</strong>
-            </div>
+      <!-- ── Step 1: Starting point ──────────────────────────── -->
+      <article class="planner-card planner-step-card" :class="{ 'step-confirmed': hasStartLocation }">
+        <div class="planner-step-badge">
+          <span class="planner-step-num">1</span> Starting Point
+        </div>
+
+        <!-- Confirmed state -->
+        <div v-if="hasStartLocation" class="planner-confirmed-row">
+          <span class="planner-confirmed-check">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          <div class="planner-confirmed-info">
+            <strong>{{ locationLabel }}</strong>
+            <small>{{ locationMeta }}</small>
           </div>
-          <button class="btn btn-light planner-location-btn" @click="useMyLocation" :disabled="isLocating || isLoadingPlan">
-            {{ isLocating ? 'Locating...' : 'Use my current location' }}
+          <button class="planner-confirmed-change-btn" type="button" @click="changeLocation" :disabled="isLoadingPlan">
+            Change
+          </button>
+        </div>
+
+        <!-- Selection state -->
+        <template v-else>
+          <h1 class="planner-step-title">Where are you starting from?</h1>
+          <p class="planner-step-desc">Choose your starting point to unlock nearby route options.</p>
+          <div class="planner-loc-options">
+            <button
+              class="planner-loc-opt"
+              :class="{ 'is-loading': isLocating }"
+              @click="useMyLocation"
+              :disabled="isLocating || isLoadingPlan"
+            >
+              <span class="planner-loc-opt-icon planner-loc-opt-icon--gps">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M4.22 4.22l2.83 2.83m9.9 9.9 2.83 2.83M2 12h4m12 0h4M4.22 19.78l2.83-2.83m9.9-9.9 2.83-2.83"/></svg>
+              </span>
+              <span class="planner-loc-opt-body">
+                <strong>{{ isLocating ? 'Detecting location…' : 'Use my current location' }}</strong>
+                <small>Automatically detect via GPS</small>
+              </span>
+            </button>
+            <button
+              class="planner-loc-opt planner-loc-opt--map"
+              @click="openMapPicker"
+              :disabled="isLoadingPlan || isLocating"
+            >
+              <span class="planner-loc-opt-icon planner-loc-opt-icon--map">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+              </span>
+              <span class="planner-loc-opt-body">
+                <strong>Pick a point on the map</strong>
+                <small>Drop a pin in Central Melbourne</small>
+              </span>
+            </button>
+          </div>
+          <p v-if="errorMessage" class="planner-loc-error-msg">{{ errorMessage }}</p>
+        </template>
+      </article>
+
+      <article v-if="isPickingOnMap" class="planner-card planner-map-picker-card" ref="pickerCardEl">
+        <div class="planner-map-picker-head">
+          <div>
+            <p class="planner-map-picker-kicker">MAP PICKER</p>
+            <h2>Select a starting point in Central Melbourne</h2>
+          </div>
+          <button class="planner-map-picker-close" type="button" @click="cancelMapPicker">Close</button>
+        </div>
+
+        <p class="planner-map-picker-copy">
+          The map is focused on the supported area so you can quickly drop a starting point inside Central Melbourne.
+        </p>
+
+        <div class="planner-map-picker-frame">
+          <div ref="pickerMapEl" class="planner-picker-map"></div>
+        </div>
+
+        <p class="planner-map-picker-range">
+          Supported area: CBD, Docklands, Southbank, Kensington, North Melbourne, West Melbourne,
+          East Melbourne, Parkville, Carlton, and South Yarra.
+        </p>
+
+        <p v-if="pickerMessage" class="planner-map-picker-message">{{ pickerMessage }}</p>
+
+        <div class="planner-map-picker-actions">
+          <button class="btn planner-change-btn" type="button" @click="cancelMapPicker">Cancel</button>
+          <button class="btn btn-primary planner-confirm-pick-btn" type="button" @click="confirmMapLocation" :disabled="!pendingMapLocation">
+            Use selected point
           </button>
         </div>
       </article>
 
-      <article class="planner-card planner-type-card-wrap" ref="typeSectionEl">
-        <h2>Where would you like to go?</h2>
+      <!-- ── Step 2: Destination type (unlocked after location set) ── -->
+      <article v-if="hasStartLocation" class="planner-card planner-step-card planner-step-type" ref="typeSectionEl">
+        <div class="planner-step-badge planner-step-badge--two">
+          <span class="planner-step-num">2</span> Destination Type
+        </div>
+        <h2 class="planner-step-title">Where would you like to go?</h2>
+        <p class="planner-step-desc">Pick a category and we'll find the best match for your journey.</p>
         <div class="planner-type-grid">
           <button
             v-for="item in destinationTypes"
@@ -39,11 +158,11 @@
         </div>
       </article>
 
-      <section class="planner-result-anchor" ref="resultAnchorEl">
+      <section v-if="hasStartLocation" class="planner-result-anchor" ref="resultAnchorEl">
         <article v-if="hasSelectedType && isLoadingPlan" class="planner-card planner-result-loading-card">
           <span class="planner-spinner" aria-hidden="true"></span>
-          <h3>Searching route options...</h3>
-          <p>Please wait while we find a nearby destination and supporting facilities.</p>
+          <h3>Finding your best route…</h3>
+          <p>We're searching for an ideal destination and planning a comfortable journey for you.</p>
         </article>
 
         <article v-else-if="hasSelectedType && hasDestination" class="planner-card planner-result-card">
@@ -115,7 +234,7 @@
         </article>
 
         <article v-else-if="hasSelectedType && hasSearched && !isLoadingPlan && !!errorMessage" class="planner-card planner-no-result-card">
-          <h3>Unable to load route right now</h3>
+          <h3>Service temporarily unavailable</h3>
           <p>{{ errorMessage }}</p>
           <div class="planner-summary-actions">
             <button class="btn planner-change-btn" @click="requestPlan">Try again</button>
@@ -143,12 +262,18 @@
 
         <div class="rv-stats-row">
           <div class="rv-stat-card">
-            <strong>{{ walkMinutes }}</strong>
-            <span>min walk</span>
+            <div class="rv-stat-main">
+              <strong>{{ walkMinutes }}</strong>
+              <strong>MIN</strong>
+            </div>
+            <span>Walking time</span>
           </div>
           <div class="rv-stat-card">
-            <strong>{{ distanceMetric.value }}</strong>
-            <span>{{ distanceMetric.unit }} away</span>
+            <div class="rv-stat-main">
+              <strong>{{ distanceMetric.value }}</strong>
+              <strong>{{ distanceMetric.unit.toUpperCase() }}</strong>
+            </div>
+            <span>Distance away</span>
           </div>
         </div>
 
@@ -227,18 +352,11 @@
               Tree canopy shade
             </div>
           </div>
-          <p class="rv-legend-note">
-            Tree canopy data will be supplied by the backend service. This legend item is kept for the map display.
-          </p>
         </div>
 
       </aside>
 
       <section class="planner-route-map-area">
-        <div class="map-chip map-chip-shade">
-          <span class="map-chip-dot" aria-hidden="true"></span>
-          Shade layer display
-        </div>
         <div v-if="isLoadingPlan" class="planner-map-loading" role="status" aria-live="polite">
           <span class="planner-spinner" aria-hidden="true"></span>
           <p>Loading route map...</p>
@@ -263,7 +381,6 @@ import groceryIcon from '../assets/svg/grocery.svg'
 import clinicIcon from '../assets/svg/clinic.svg'
 import parkIcon from '../assets/svg/park.svg'
 import cafeIcon from '../assets/svg/break-cafe.svg'
-import locationIcon from '../assets/svg/location-icon.svg'
 import benchIcon from '../assets/svg/bench-icon.svg'
 import toiletIcon from '../assets/svg/toilet-icon.svg'
 import fountainIcon from '../assets/svg/drinking-fountain-icon.svg'
@@ -273,7 +390,13 @@ import walkIcon from '../assets/svg/walk.svg'
 import timeIcon from '../assets/svg/time-icon.svg'
 
 const DEFAULT_LOCATION = { lat: -37.8136, lng: 144.9631 }
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000'
+const SUPPORTED_AREA_BOUNDS = [
+  [-37.848, 144.89],
+  [-37.77, 145.02]
+]
+const DEFAULT_API_BASE_URL = 'https://g5m02vygkj.execute-api.ap-southeast-2.amazonaws.com'
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
+const API_BASE_URL = configuredApiBaseUrl.replace(/\/+$/, '')
 
 const destinationTypes = [
   { id: 'pharmacy', label: 'Pharmacy', icon: pharmacyIcon, image: pharmacyPic },
@@ -288,11 +411,15 @@ const isLoadingPlan = ref(false)
 const isLocating = ref(false)
 const isRouteView = ref(false)
 const hasSearched = ref(false)
+const showPlannerIntro = ref(true)
+const isPickingOnMap = ref(false)
+const pendingMapLocation = ref(null)
+const pickerMessage = ref('')
 
 const userLocation = reactive({
-  lat: DEFAULT_LOCATION.lat,
-  lng: DEFAULT_LOCATION.lng,
-  source: 'default'
+  lat: null,
+  lng: null,
+  source: 'unset'
 })
 
 const result = reactive({
@@ -305,15 +432,21 @@ const errorMessage = ref('')
 const infoMessage = ref('')
 const resultAnchorEl = ref(null)
 const typeSectionEl = ref(null)
+const pickerCardEl = ref(null)
 
 const mapEl = ref(null)
+const pickerMapEl = ref(null)
 let map = null
 let userLayer = null
 let destinationLayer = null
 let facilitiesLayer = null
 let routeLayer = null
+let pickerMap = null
+let pickerSelectionLayer = null
+let pickerBoundsLayer = null
 let activeRequestId = 0
 
+const hasStartLocation = computed(() => Number.isFinite(userLocation.lat) && Number.isFinite(userLocation.lng) && userLocation.source !== 'unset')
 const hasSelectedType = computed(() => !!selectedType.value)
 const hasDestination = computed(() => !!result.destination)
 
@@ -322,7 +455,17 @@ const selectedTypeLabel = computed(() => {
   return item ? item.label : 'Destination'
 })
 
-const locationLabel = computed(() => (userLocation.source === 'live' ? 'Current location' : 'Melbourne CBD (Default)'))
+const locationLabel = computed(() => {
+  if (userLocation.source === 'live') return 'Current location selected'
+  if (userLocation.source === 'map') return 'Map point selected'
+  return 'Starting point not set'
+})
+
+const locationMeta = computed(() => {
+  if (!hasStartLocation.value) return 'Choose your location to begin.'
+  if (userLocation.source === 'live') return 'Detected from your device.'
+  return `Pinned at ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`
+})
 
 const resultImage = computed(() => {
   const match = destinationTypes.find((item) => item.id === selectedType.value)
@@ -405,6 +548,169 @@ const clearResult = () => {
   result.route = []
 }
 
+const setStartLocation = (lat, lng, source) => {
+  userLocation.lat = lat
+  userLocation.lng = lng
+  userLocation.source = source
+  errorMessage.value = ''
+  pickerMessage.value = ''
+}
+
+const ensureSupportedPoint = (latlng) => {
+  const bounds = L.latLngBounds(SUPPORTED_AREA_BOUNDS)
+  return bounds.contains(latlng)
+}
+
+const updatePickerMarker = (latlng) => {
+  if (!pickerMap || !pickerSelectionLayer) return
+  pickerSelectionLayer.clearLayers()
+  L.circleMarker(latlng, {
+    radius: 10,
+    color: '#124f24',
+    weight: 3,
+    fillColor: '#7fc96a',
+    fillOpacity: 0.95
+  }).addTo(pickerSelectionLayer)
+}
+
+const handlePickerMapClick = (event) => {
+  if (!ensureSupportedPoint(event.latlng)) {
+    pickerMessage.value = 'Please choose a point inside the supported Central Melbourne area.'
+    return
+  }
+
+  pendingMapLocation.value = {
+    lat: event.latlng.lat,
+    lng: event.latlng.lng
+  }
+  pickerMessage.value = 'Point selected. Confirm to continue.'
+  updatePickerMarker(event.latlng)
+}
+
+const ensurePickerMap = () => {
+  if (pickerMap || !pickerMapEl.value) return
+
+  pickerMap = L.map(pickerMapEl.value, { zoomControl: true, scrollWheelZoom: true, attributionControl: true })
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 20
+  }).addTo(pickerMap)
+
+  pickerBoundsLayer = L.layerGroup().addTo(pickerMap)
+  pickerSelectionLayer = L.layerGroup().addTo(pickerMap)
+
+  L.rectangle(SUPPORTED_AREA_BOUNDS, {
+    color: '#2f7f4a',
+    weight: 2,
+    fillColor: '#8fcb9d',
+    fillOpacity: 0.14,
+    dashArray: '8 8'
+  }).addTo(pickerBoundsLayer)
+
+  pickerMap.on('click', handlePickerMapClick)
+  pickerMap.fitBounds(SUPPORTED_AREA_BOUNDS, { padding: [24, 24] })
+}
+
+const destroyPickerMap = () => {
+  if (!pickerMap) return
+  pickerMap.off('click', handlePickerMapClick)
+  pickerMap.remove()
+  pickerMap = null
+  pickerSelectionLayer = null
+  pickerBoundsLayer = null
+}
+
+const openMapPicker = async () => {
+  isPickingOnMap.value = true
+  pickerMessage.value = ''
+
+  if (userLocation.source === 'map' && hasStartLocation.value) {
+    pendingMapLocation.value = { lat: userLocation.lat, lng: userLocation.lng }
+  } else {
+    pendingMapLocation.value = null
+  }
+
+  await nextTick()
+  ensurePickerMap()
+  pickerMap?.fitBounds(SUPPORTED_AREA_BOUNDS, { padding: [24, 24] })
+
+  if (pendingMapLocation.value) {
+    const latlng = L.latLng(pendingMapLocation.value.lat, pendingMapLocation.value.lng)
+    updatePickerMarker(latlng)
+    pickerMap?.panTo(latlng)
+  }
+
+  scrollTo(pickerCardEl.value)
+}
+
+const cancelMapPicker = () => {
+  isPickingOnMap.value = false
+  pendingMapLocation.value = null
+  pickerMessage.value = ''
+}
+
+const confirmMapLocation = async () => {
+  if (!pendingMapLocation.value) return
+  setStartLocation(pendingMapLocation.value.lat, pendingMapLocation.value.lng, 'map')
+  isPickingOnMap.value = false
+
+  if (hasSelectedType.value) {
+    await requestPlan()
+  }
+
+  await nextTick()
+  scrollTo(typeSectionEl.value)
+}
+
+const toFiniteNumber = (value, fallback = null) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const normalizeRoutePoint = (point) => {
+  if (!Array.isArray(point) || point.length < 2) return null
+  const lng = toFiniteNumber(point[0])
+  const lat = toFiniteNumber(point[1])
+  return lng == null || lat == null ? null : [lng, lat]
+}
+
+const normalizeDestination = (destination) => {
+  if (!destination || typeof destination !== 'object') return null
+  return {
+    ...destination,
+    lat: toFiniteNumber(destination.lat),
+    lng: toFiniteNumber(destination.lng),
+    distanceMeters: toFiniteNumber(destination.distanceMeters, 0)
+  }
+}
+
+const normalizeFacilities = (facilities) => {
+  if (!Array.isArray(facilities)) return []
+  return facilities
+    .filter((facility) => facility && typeof facility === 'object')
+    .map((facility) => ({
+      ...facility,
+      lat: toFiniteNumber(facility.lat),
+      lng: toFiniteNumber(facility.lng),
+      distanceMeters: toFiniteNumber(facility.distanceMeters, 0),
+      conditionRating: toFiniteNumber(facility.conditionRating)
+    }))
+}
+
+const normalizePlanResponse = (payload) => {
+  const normalizedRoute = Array.isArray(payload?.route)
+    ? payload.route.map(normalizeRoutePoint).filter(Boolean)
+    : []
+
+  return {
+    destination: normalizeDestination(payload?.destination),
+    route: normalizedRoute,
+    facilities: normalizeFacilities(payload?.facilities),
+    message: typeof payload?.message === 'string' ? payload.message : ''
+  }
+}
+
 const fetchJson = async (url, options = {}, timeoutMs = 20000) => {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -419,13 +725,13 @@ const fetchJson = async (url, options = {}, timeoutMs = 20000) => {
 }
 
 const requestPlan = async () => {
-  if (!selectedType.value) return
+  if (!selectedType.value || !hasStartLocation.value) return
 
   const requestId = ++activeRequestId
   const requestType = selectedType.value
   const requestLat = Number.isFinite(Number(userLocation.lat)) ? Number(userLocation.lat) : DEFAULT_LOCATION.lat
   const requestLng = Number.isFinite(Number(userLocation.lng)) ? Number(userLocation.lng) : DEFAULT_LOCATION.lng
-  const maxAttempts = userLocation.source === 'default' ? 2 : 1
+  const maxAttempts = 1
 
   hasSearched.value = true
   isLoadingPlan.value = true
@@ -446,7 +752,9 @@ const requestPlan = async () => {
         })
       })
       // retry if destination found but route is empty (e.g. ORS cold-start failure)
-      const routeReady = payload?.destination && (payload.route?.length ?? 0) > 1
+      const normalizedPayload = normalizePlanResponse(payload)
+      payload = normalizedPayload
+      const routeReady = normalizedPayload.destination && normalizedPayload.route.length > 1
       if (routeReady || !payload?.destination || attempt === maxAttempts) break
       await new Promise((resolve) => setTimeout(resolve, 800))
     }
@@ -462,9 +770,7 @@ const requestPlan = async () => {
   } catch (error) {
     if (requestId !== activeRequestId) return
     clearResult()
-    errorMessage.value = error instanceof Error
-      ? `${error.message}. Make sure backend is running at ${API_BASE_URL}.`
-      : 'Unable to load route data.'
+    errorMessage.value = 'The route planning service is currently busy. Please try again shortly.'
   } finally {
     if (requestId !== activeRequestId) return
     isLoadingPlan.value = false
@@ -473,7 +779,7 @@ const requestPlan = async () => {
 
 const useMyLocation = async () => {
   if (!navigator.geolocation) {
-    errorMessage.value = 'Geolocation is unavailable. Using Melbourne CBD default location.'
+    errorMessage.value = 'Geolocation is unavailable on this device. Please choose a point on the map instead.'
     return
   }
 
@@ -486,19 +792,19 @@ const useMyLocation = async () => {
         maximumAge: 300000
       })
     })
-    userLocation.lat = position.coords.latitude
-    userLocation.lng = position.coords.longitude
-    userLocation.source = 'live'
+    const nextPoint = L.latLng(position.coords.latitude, position.coords.longitude)
+    if (!ensureSupportedPoint(nextPoint)) {
+      errorMessage.value = 'Your current location is outside the supported Central Melbourne area. Please choose a point on the map.'
+      return
+    }
+    setStartLocation(nextPoint.lat, nextPoint.lng, 'live')
   } catch {
-    userLocation.lat = DEFAULT_LOCATION.lat
-    userLocation.lng = DEFAULT_LOCATION.lng
-    userLocation.source = 'default'
-    errorMessage.value = 'Could not detect your location. Using Melbourne CBD default.'
+    errorMessage.value = 'Could not detect your location. Please choose a point on the map.'
   } finally {
     isLocating.value = false
   }
 
-  if (hasSelectedType.value) requestPlan()
+  if (hasSelectedType.value && hasStartLocation.value) requestPlan()
 }
 
 const clearDestinationChoice = () => {
@@ -510,6 +816,19 @@ const clearDestinationChoice = () => {
   isRouteView.value = false
   clearResult()
   nextTick(() => scrollTo(typeSectionEl.value))
+}
+
+const changeLocation = () => {
+  activeRequestId += 1
+  userLocation.lat = null
+  userLocation.lng = null
+  userLocation.source = 'unset'
+  selectedType.value = ''
+  errorMessage.value = ''
+  infoMessage.value = ''
+  hasSearched.value = false
+  isRouteView.value = false
+  clearResult()
 }
 
 const haversineMeters = (lat1, lng1, lat2, lng2) => {
@@ -662,9 +981,15 @@ watch(selectedType, async () => {
     hasSearched.value = false
     return
   }
+  if (!hasStartLocation.value) return
   requestPlan()
   await nextTick()
   scrollTo(resultAnchorEl.value)
+})
+
+watch(isPickingOnMap, (visible) => {
+  if (visible) return
+  destroyPickerMap()
 })
 
 watch(
@@ -685,5 +1010,6 @@ watch(
 onBeforeUnmount(() => {
   map?.remove()
   map = null
+  destroyPickerMap()
 })
 </script>

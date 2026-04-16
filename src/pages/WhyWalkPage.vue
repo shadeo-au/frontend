@@ -2,6 +2,32 @@
 import { ref, onMounted } from 'vue';
 
 const showAnimation = ref(false);
+const quizTitle = ref('');
+const quizBody = ref('');
+const hasAnsweredQuiz = ref(false);
+
+const quizFeedback = {
+  today: {
+    title: 'Great work, keep it up!',
+    body: 'Your body will thank you for it. Keep going!'
+  },
+  week: {
+    title: 'Nice! A couple more walks would be even better.',
+    body: 'Research shows 150 minutes of walking per week significantly improves heart health.'
+  },
+  long: {
+    title: "That's okay — today is a great place to start.",
+    body: "You don't need to go far. Let us find a safe, comfortable route near you."
+  }
+};
+
+const handleQuizAnswer = (key) => {
+  const response = quizFeedback[key];
+  if (!response) return;
+  quizTitle.value = response.title;
+  quizBody.value = response.body;
+  hasAnsweredQuiz.value = true;
+};
 
 onMounted(() => {
   setTimeout(() => {
@@ -178,6 +204,29 @@ onMounted(() => {
             <div class="time-content">
               <strong>Heart-healthy workout completed.</strong> You've successfully finished a bout of exercise. Tonight's sleep will be deeper and more restful.
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section bg-white walk-check-section">
+      <div class="container">
+        <div class="walk-check-shell">
+          <p class="walk-check-question">When did you last go for a walk outside?</p>
+          <div class="walk-check-options">
+            <button class="walk-check-btn" :disabled="hasAnsweredQuiz" @click="handleQuizAnswer('today')">
+              Today or yesterday
+            </button>
+            <button class="walk-check-btn" :disabled="hasAnsweredQuiz" @click="handleQuizAnswer('week')">
+              Sometime this week
+            </button>
+            <button class="walk-check-btn" :disabled="hasAnsweredQuiz" @click="handleQuizAnswer('long')">
+              It's been a long time
+            </button>
+          </div>
+          <div v-if="hasAnsweredQuiz" class="walk-check-result">
+            <div class="walk-check-result-title">{{ quizTitle }}</div>
+            <div class="walk-check-result-body">{{ quizBody }}</div>
           </div>
         </div>
       </div>
@@ -732,6 +781,107 @@ onMounted(() => {
   font-size: 1.25rem;
   margin-bottom: 6px;
   color: var(--text-main);
+}
+
+/* Walk check */
+.walk-check-section {
+  padding-top: 36px;
+  padding-bottom: 72px;
+}
+
+.walk-check-shell {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 52px 48px;
+  background: linear-gradient(180deg, #f7efe2 0%, #f3ead8 100%);
+  border: 1.5px solid #d8cfbd;
+  border-radius: 28px;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(49, 65, 44, 0.08);
+}
+
+.walk-check-question {
+  font-family: 'Georgia', serif;
+  font-size: clamp(1.8rem, 3.4vw, 2.35rem);
+  font-weight: 700;
+  line-height: 1.3;
+  color: #18261a;
+  margin-bottom: 28px;
+}
+
+.walk-check-options {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.walk-check-btn {
+  width: 100%;
+  min-height: 62px;
+  padding: 18px 24px;
+  border-radius: 22px;
+  border: 2px solid #d5ddcf;
+  background: #ffffff;
+  color: #1a2f1c;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+}
+
+.walk-check-btn:hover:not(:disabled) {
+  background: #edf6eb;
+  border-color: var(--primary-color);
+  transform: translateY(-1px);
+}
+
+.walk-check-btn:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.walk-check-result {
+  margin-top: 26px;
+  padding: 24px 28px;
+  background: #e8f3e8;
+  border: 2px solid #c9e0c9;
+  border-radius: 22px;
+  text-align: left;
+}
+
+.walk-check-result-title {
+  font-family: 'Georgia', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin-bottom: 10px;
+}
+
+.walk-check-result-body {
+  font-size: 1.1rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .walk-check-shell {
+    padding: 34px 20px;
+    border-radius: 24px;
+  }
+
+  .walk-check-btn {
+    min-height: 58px;
+    font-size: 1rem;
+    padding: 16px 18px;
+  }
+
+  .walk-check-result {
+    padding: 20px;
+  }
 }
 
 /* CTA */
