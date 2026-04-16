@@ -425,7 +425,11 @@ const userLocation = reactive({
 const result = reactive({
   destination: null,
   facilities: [],
-  route: []
+  route: [],
+  metrics: {
+    distanceMeters: null,
+    durationMinutes: null
+  }
 })
 
 const errorMessage = ref('')
@@ -473,23 +477,8 @@ const resultImage = computed(() => {
 })
 
 const routeDistanceMeters = computed(() => {
-  if (result.route.length > 1) {
-    let total = 0
-    for (let i = 1; i < result.route.length; i += 1) {
-      const [lng1, lat1] = result.route[i - 1]
-      const [lng2, lat2] = result.route[i]
-      total += haversineMeters(lat1, lng1, lat2, lng2)
-    }
-    return Math.round(total)
-  }
-  return result.destination?.distanceMeters || 0
-})
-
-const distanceText = computed(() => {
-  const meters = routeDistanceMeters.value
-  if (!meters) return 'Distance unavailable'
-  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`
-  return `${meters} m`
+  if (!Number.isFinite(result.metrics?.distanceMeters)) return 0
+  return Math.max(0, Math.round(result.metrics.distanceMeters))
 })
 
 const distanceMetric = computed(() => {
@@ -500,9 +489,8 @@ const distanceMetric = computed(() => {
 })
 
 const walkMinutes = computed(() => {
-  const meters = routeDistanceMeters.value
-  if (!meters) return '--'
-  return Math.max(1, Math.round(meters / 78))
+  if (!Number.isFinite(result.metrics?.durationMinutes)) return '--'
+  return `${Math.max(1, Math.round(result.metrics.durationMinutes))}`
 })
 
 const walkMetric = computed(() => ({
@@ -546,6 +534,10 @@ const clearResult = () => {
   result.destination = null
   result.facilities = []
   result.route = []
+  result.metrics = {
+    distanceMeters: null,
+    durationMinutes: null
+  }
 }
 
 const setStartLocation = (lat, lng, source) => {
@@ -681,7 +673,7 @@ const normalizeDestination = (destination) => {
     ...destination,
     lat: toFiniteNumber(destination.lat),
     lng: toFiniteNumber(destination.lng),
-    distanceMeters: toFiniteNumber(destination.distanceMeters, 0)
+    distanceMeters: toFiniteNumber(destination.distanceMeters)
   }
 }
 
@@ -693,20 +685,40 @@ const normalizeFacilities = (facilities) => {
       ...facility,
       lat: toFiniteNumber(facility.lat),
       lng: toFiniteNumber(facility.lng),
-      distanceMeters: toFiniteNumber(facility.distanceMeters, 0),
+      distanceMeters: toFiniteNumber(facility.distanceMeters),
       conditionRating: toFiniteNumber(facility.conditionRating)
     }))
 }
 
+const normalizePlanMetrics = (routeSummary) => {
+  const distanceMeters = toFiniteNumber(routeSummary?.walkingDistanceMeters)
+
+  let durationMinutes = toFiniteNumber(routeSummary?.walkingDurationMinutes)
+  if (durationMinutes == null) {
+    const durationSeconds = toFiniteNumber(routeSummary?.walkingDurationSeconds)
+    if (durationSeconds != null) {
+      durationMinutes = Math.max(1, Math.round(durationSeconds / 60))
+    }
+  }
+
+  return {
+    distanceMeters: distanceMeters == null ? null : Math.max(0, Math.round(distanceMeters)),
+    durationMinutes: durationMinutes == null ? null : Math.max(1, Math.round(durationMinutes))
+  }
+}
+
 const normalizePlanResponse = (payload) => {
+  const normalizedDestination = normalizeDestination(payload?.destination)
   const normalizedRoute = Array.isArray(payload?.route)
     ? payload.route.map(normalizeRoutePoint).filter(Boolean)
     : []
+  const normalizedMetrics = normalizePlanMetrics(payload?.routeSummary)
 
   return {
-    destination: normalizeDestination(payload?.destination),
+    destination: normalizedDestination,
     route: normalizedRoute,
     facilities: normalizeFacilities(payload?.facilities),
+    metrics: normalizedMetrics,
     message: typeof payload?.message === 'string' ? payload.message : ''
   }
 }
@@ -761,10 +773,11 @@ const requestPlan = async () => {
 
     if (requestId !== activeRequestId) return
 
-    result.destination = payload?.destination || null
-    result.facilities = payload?.facilities || []
-    result.route = payload?.route || []
-    infoMessage.value = payload?.message || 'Route recommendation is ready.'
+    result.destination = payload.destination || null
+    result.facilities = payload.facilities || []
+    result.route = payload.route || []
+    result.metrics = payload.metrics
+    infoMessage.value = payload.message || 'Route recommendation is ready.'
 
     if (isRouteView.value) drawRouteMap()
   } catch (error) {
@@ -829,26 +842,6 @@ const changeLocation = () => {
   hasSearched.value = false
   isRouteView.value = false
   clearResult()
-}
-
-const haversineMeters = (lat1, lng1, lat2, lng2) => {
-  const toRad = (value) => (value * Math.PI) / 180
-  const earth = 6371000
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-  return earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-const calcBearing = ([lat1, lng1], [lat2, lng2]) => {
-  const toRad = v => v * Math.PI / 180
-  const dLng = toRad(lng2 - lng1)
-  const y = Math.sin(dLng) * Math.cos(toRad(lat2))
-  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-            Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng)
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
 }
 
 const ensureMap = () => {
@@ -965,11 +958,17 @@ const drawRouteMap = () => {
 const openRouteView = async () => {
   if (!canSeeRoute.value) return
   isRouteView.value = true
+  window.scrollTo(0, 0)
+  document.documentElement.scrollTop = 0
+  document.body.scrollTop = 0
   await nextTick()
   ensureMap()
   drawRouteMap()
   // double-rAF: wait for browser layout to complete before fixing size
-  requestAnimationFrame(() => requestAnimationFrame(() => map?.invalidateSize()))
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    window.scrollTo(0, 0)
+    map?.invalidateSize()
+  }))
 }
 
 watch(selectedType, async () => {

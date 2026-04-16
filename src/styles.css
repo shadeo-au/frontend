@@ -822,7 +822,7 @@ h4 {
 
 .try-planner-section {
   padding: 0;
-  margin-top: 7rem;
+  margin-top: 0;
   background: #f4f7f2;
 }
 
@@ -1683,7 +1683,7 @@ h4 {
   }
 
   .try-planner-section {
-    padding-top: 1rem;
+    padding-top: 0;
     padding-bottom: 1.2rem;
   }
 
@@ -2954,9 +2954,11 @@ h4 {
   color: #0f3d1c !important;
   line-height: 1.2 !important;
   margin: 0 !important;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rv-stats-row {
