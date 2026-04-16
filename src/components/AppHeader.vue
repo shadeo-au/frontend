@@ -1,28 +1,27 @@
 ﻿<template>
   <header class="site-header" :class="{ solid: isSolid }">
     <div class="shell header-inner">
-      <a class="brand" href="#/">
+      <RouterLink class="brand" to="/">
         <BrandMark class="brand-mark" />
         <span>GreenPath</span>
-      </a>
+      </RouterLink>
 
       <nav class="main-nav" aria-label="Primary">
-        <a :class="{ active: currentPath === '/' }" href="#/">Home</a>
-        <a :class="{ active: currentPath === '/why-walk' }" href="#/why-walk">Why Walk</a>
-        <a :class="{ active: currentPath === '/planner' }" href="#/planner">Plan a Route</a>
+        <RouterLink :class="{ active: route.path === '/' }" to="/">Home</RouterLink>
+        <RouterLink :class="{ active: route.path === '/why-walk' }" to="/why-walk">Why Walk</RouterLink>
+        <RouterLink :class="{ active: route.path === '/planner' }" to="/planner">Plan a Route</RouterLink>
       </nav>
     </div>
   </header>
 </template>
 
 <script setup>
+import { RouterLink, useRoute } from 'vue-router'
 import BrandMark from './BrandMark.vue'
 
+const route = useRoute()
+
 defineProps({
-  currentPath: {
-    type: String,
-    required: true
-  },
   isSolid: {
     type: Boolean,
     default: false

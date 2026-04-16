@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue';
+import { RouterLink } from 'vue-router'
 
 const showAnimation = ref(false);
 const quizTitle = ref('');
@@ -239,7 +240,7 @@ onMounted(() => {
         <p class="cta-desc">
           We can help you find shaded paths, available rest stops, and emergency facilities — everything to walk with confidence.
         </p>
-        <a href="#/planner" class="btn btn-primary btn-large">Find Routes Near Me →</a>
+        <RouterLink to="/planner" class="btn btn-primary btn-large">Find Routes Near Me →</RouterLink>
       </div>
     </section>
   </main>
