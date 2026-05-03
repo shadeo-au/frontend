@@ -202,7 +202,7 @@ onBeforeUnmount(() => {
             route using distance, shade cover, and rest facilities.
           </p>
           <div class="section-actions">
-            <AppButton href="#awareness" variant="feature">View Awareness</AppButton>
+            <AppButton href="#awareness" variant="feature">View Heat Map</AppButton>
           </div>
         </template>
 
@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
 
       <PageSection id="awareness" tone="warm" side-label="Section 03 - Awareness">
         <template #copy>
-          <SectionKicker>Raising awareness</SectionKicker>
+          <SectionKicker>Heat Vulnerability Index</SectionKicker>
           <h2>Show where hot days may be harder.</h2>
           <p>
             Shadeo visualises where high heat, fewer trees, fewer cooling facilities,
@@ -228,26 +228,8 @@ onBeforeUnmount(() => {
         </template>
 
         <template #visual>
-          <VisualPanel class="awareness-visual">
-            <div class="route-line" aria-hidden="true">
-              <span class="stop stop--one" />
-              <span class="stop stop--two" />
-              <span class="stop stop--three" />
-            </div>
-            <div class="awareness-panel">
-              <div>
-                <strong>38C</strong>
-                <span>street surface</span>
-              </div>
-              <div>
-                <strong>22%</strong>
-                <span>tree canopy</span>
-              </div>
-              <div>
-                <strong>6</strong>
-                <span>cool stops nearby</span>
-              </div>
-            </div>
+          <VisualPanel tone="paper" class="video-visual">
+            <video src="/Visualization.mp4" autoplay muted loop playsinline preload="metadata" />
           </VisualPanel>
         </template>
       </PageSection>

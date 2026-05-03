@@ -24,7 +24,7 @@ const links = [
   { label: 'Home', href: '/#hero', path: '/', hash: '#hero' },
   { label: 'Why', href: '/why', path: '/why' },
   { label: 'Cool Routes', href: '/#navigation', path: '/', hash: '#navigation' },
-  { label: 'Awareness', href: '/#awareness', path: '/', hash: '#awareness' },
+  { label: 'Awareness Map', href: '/#awareness', path: '/', hash: '#awareness' },
   { label: 'Self-Check', href: '/#self-check', path: '/', hash: '#self-check' },
 ];
 
@@ -78,7 +78,6 @@ const isActive = (link: { path: string; hash?: string }) => {
       >
         {{ link.label }}
       </a>
-      <AppButton href="/#self-check" size="lg" @click="closeMenu">Check Your Heat Risk</AppButton>
     </div>
   </header>
 </template>
