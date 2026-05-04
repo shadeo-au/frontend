@@ -45,7 +45,7 @@ defineEmits<{
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .wq__legend {
@@ -56,6 +56,7 @@ defineEmits<{
   line-height: 1.25;
   letter-spacing: 0;
   text-wrap: balance;
+  padding-bottom: 4px;
 }
 
 .wq__helper {
@@ -135,6 +136,8 @@ defineEmits<{
 }
 
 .wq__option:focus-within {
-  box-shadow: var(--brand-focus-ring);
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--brand-sage);
+  border-color: var(--brand-sage);
 }
 </style>

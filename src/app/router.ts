@@ -19,6 +19,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/WalkPlannerPage.vue'),
   },
   {
+    path: '/self-check',
+    component: () => import('../pages/SelfCheckPage.vue'),
+  },
+  {
     path: '/cool-routes',
     redirect: '/walk-planner',
   },

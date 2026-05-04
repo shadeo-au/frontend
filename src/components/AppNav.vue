@@ -25,7 +25,7 @@ const links = [
   { label: 'Why', href: '/why', path: '/why' },
   { label: 'Walk Planner', href: '/walk-planner', path: '/walk-planner' },
   { label: 'Awareness Map', href: '/awareness', path: '/awareness' },
-  { label: 'Self-Check', href: '/#self-check', path: '/', hash: '#self-check' },
+  { label: 'Self-Check', href: '/self-check', path: '/self-check' },
 ];
 
 const closeMenu = () => {
@@ -34,7 +34,12 @@ const closeMenu = () => {
 
 const isActive = (link: { path: string; hash?: string }) => {
   if (route.path !== link.path) return false;
-  if (link.path === '/why' || link.path === '/awareness' || link.path === '/walk-planner') return true;
+  if (
+    link.path === '/why' ||
+    link.path === '/awareness' ||
+    link.path === '/walk-planner' ||
+    link.path === '/self-check'
+  ) return true;
   if (!link.hash) return route.hash === '';
   return route.hash === link.hash || (link.hash === '#hero' && route.hash === '');
 };

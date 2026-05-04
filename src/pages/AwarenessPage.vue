@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AppNav from '../components/AppNav.vue';
 import AppButton from '../components/AppButton.vue';
 import BrandWatermark from '../components/BrandWatermark.vue';
 import SectionKicker from '../components/SectionKicker.vue';
-import VisualPanel from '../components/VisualPanel.vue';
+import HeroFullSection from '../components/HeroFullSection.vue';
 import HviCanvasMap from '../components/awareness/HviCanvasMap.vue';
 
 type StoryKey = 'shade' | 'support' | 'places';
 
+const root = ref<HTMLElement | null>(null);
 const activeStory = ref<StoryKey>('shade');
 
 const stories: Record<StoryKey, {
@@ -50,41 +51,38 @@ const stories: Record<StoryKey, {
 };
 
 const activeStoryData = computed(() => stories[activeStory.value]);
+
+onMounted(() => {
+  const els = root.value?.querySelectorAll('[data-rise]') ?? [];
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-in');
+          io.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.1 }
+  );
+  els.forEach((el) => io.observe(el));
+});
+
+onBeforeUnmount(() => {/* io cleaned up via unobserve */});
 </script>
 
 <template>
-  <div class="awareness-page">
+  <div ref="root" class="awareness-page">
     <AppNav />
 
     <main>
-      <section class="awareness-hero">
-        <BrandWatermark />
-        <span class="awareness-hero__side">Section 01 - Awareness Map</span>
-
-        <div class="awareness-hero__copy" data-rise>
-          <SectionKicker>Awareness map</SectionKicker>
-          <h1>See where hot days may be harder.</h1>
-          <p>
-            Shadeo turns local heat and community data into a calm map, so older adults,
-            carers, and community workers can plan support before very hot days.
-          </p>
-          <div class="awareness-hero__actions">
-            <AppButton href="#hvi-map" variant="feature">Explore Map</AppButton>
-          </div>
-        </div>
-
-        <VisualPanel class="awareness-hero__visual" tone="white">
-          <div class="hero-preview" aria-hidden="true">
-            <div class="hero-preview__map">
-              <span v-for="item in 24" :key="item" />
-            </div>
-            <div class="hero-preview__card">
-              <strong>Suburb-level pattern</strong>
-              <small>Heat, shade, age, care, and support in one view.</small>
-            </div>
-          </div>
-        </VisualPanel>
-      </section>
+      <HeroFullSection
+        id="awareness-hero"
+        image-src="/awarenesspage.png"
+        image-alt="A heat vulnerability map of Melbourne suburbs overlaid with community icons, representing how Shadeo helps older adults, carers, and community workers plan support during hot days."
+      >
+        <h1>See where hot days may be harder.</h1>
+      </HeroFullSection>
 
       <section id="hvi-map" class="map-section">
         <BrandWatermark />
@@ -216,7 +214,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
   background: var(--brand-paper-white);
 }
 
-.awareness-hero,
 .map-section,
 .story-section,
 .action-section {
@@ -224,19 +221,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
   isolation: isolate;
   overflow: hidden;
   padding-inline: max(var(--gutter), calc((100vw - 1240px) / 2));
-}
-
-.awareness-hero {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1fr);
-  align-items: center;
-  gap: clamp(42px, 6vw, 88px);
-  padding-top: calc(var(--nav-h) + 64px);
-  padding-bottom: 60px;
-  background:
-    radial-gradient(circle at 78% 20%, rgba(155, 224, 111, 0.18), transparent 32%),
-    linear-gradient(180deg, var(--brand-paper-white) 0%, var(--brand-paper) 100%);
 }
 
 .map-section,
@@ -261,7 +245,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
     linear-gradient(180deg, var(--brand-paper-white) 0%, rgba(228, 248, 213, 0.42) 100%);
 }
 
-.awareness-hero__side,
 .map-section__side,
 .story-section__side,
 .action-section__side {
@@ -278,7 +261,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
   text-transform: uppercase;
 }
 
-.awareness-hero__copy,
 .map-section__intro,
 .story-section__copy,
 .action-section__copy {
@@ -286,13 +268,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
   z-index: 2;
 }
 
-.awareness-hero__copy {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-.awareness-hero h1,
 .map-section h2,
 .story-section h2,
 .action-section h2 {
@@ -306,12 +281,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
   text-wrap: balance;
 }
 
-.awareness-hero h1 {
-  max-width: 11ch;
-  font-size: var(--brand-fs-hero);
-}
-
-.awareness-hero p,
 .map-section__intro p,
 .story-section__copy p,
 .action-section__copy p {
@@ -320,82 +289,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
   font-size: var(--brand-fs-lead);
   font-weight: 650;
   line-height: var(--brand-lh-copy);
-}
-
-.awareness-hero__actions {
-  padding-top: 8px;
-}
-
-.awareness-hero__visual {
-  min-height: min(620px, 62vh);
-}
-
-.hero-preview {
-  height: 100%;
-  min-height: min(620px, 62vh);
-  position: relative;
-  display: grid;
-  place-items: center;
-  padding: clamp(24px, 4vw, 50px);
-  background:
-    radial-gradient(circle at 70% 28%, rgba(155, 224, 111, 0.32), transparent 30%),
-    radial-gradient(circle at 24% 72%, rgba(168, 212, 226, 0.28), transparent 34%),
-    rgba(251, 246, 235, 0.5);
-}
-
-.hero-preview__map {
-  width: min(100%, 620px);
-  aspect-ratio: 1.25;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-  transform: rotate(-4deg);
-}
-
-.hero-preview__map span {
-  border-radius: 18px;
-  background: rgba(155, 224, 111, 0.35);
-  border: 1px solid rgba(16, 19, 15, 0.05);
-}
-
-.hero-preview__map span:nth-child(3n) {
-  background: rgba(239, 180, 71, 0.34);
-}
-
-.hero-preview__map span:nth-child(5n) {
-  background: rgba(201, 89, 73, 0.28);
-}
-
-.hero-preview__card {
-  position: absolute;
-  left: clamp(20px, 5vw, 52px);
-  bottom: clamp(20px, 5vw, 52px);
-  max-width: 310px;
-  padding: 20px;
-  border: 1px solid var(--brand-line);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: var(--brand-shadow-nav);
-}
-
-.hero-preview__card strong,
-.hero-preview__card small {
-  display: block;
-}
-
-.hero-preview__card strong {
-  color: var(--brand-ink);
-  font-size: 1.3rem;
-  font-weight: 950;
-  line-height: 1.18;
-}
-
-.hero-preview__card small {
-  margin-top: 8px;
-  color: var(--brand-ink-muted);
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.4;
 }
 
 .map-section__intro,
@@ -618,20 +511,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
 }
 
 @media (max-width: 980px) {
-  .awareness-hero {
-    min-height: auto;
-    grid-template-columns: 1fr;
-    padding-top: calc(var(--nav-h) + 56px);
-  }
-
-  .awareness-hero__visual {
-    min-height: 420px;
-  }
-
-  .hero-preview {
-    min-height: 420px;
-  }
-
   .map-section__intro,
   .map-explainer,
   .story-section__copy,
@@ -657,21 +536,18 @@ const activeStoryData = computed(() => stories[activeStory.value]);
 }
 
 @media (max-width: 640px) {
-  .awareness-hero,
   .map-section,
   .story-section,
   .action-section {
     padding-inline: var(--gutter);
   }
 
-  .awareness-hero__side,
   .map-section__side,
   .story-section__side,
   .action-section__side {
     display: none;
   }
 
-  .awareness-hero h1,
   .map-section h2,
   .story-section h2,
   .action-section h2 {
@@ -680,7 +556,6 @@ const activeStoryData = computed(() => stories[activeStory.value]);
     line-height: 1.08;
   }
 
-  .awareness-hero p,
   .map-section__intro p,
   .story-section__copy p,
   .action-section__copy p {
