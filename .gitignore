@@ -36,3 +36,7 @@ install.cmd
 # OS/archive scratch
 *.tmp
 *.temp
+
+
+*.md
+*.env
