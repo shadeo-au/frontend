@@ -75,7 +75,7 @@ const ratingDots = computed(() => {
           </span>
         </div>
         <div class="metric metric--accent">
-          <small>UV index</small>
+          <small>PEAK UV TODAY</small>
           <strong>{{ snapshot.uv_max_today != null ? Math.round(snapshot.uv_max_today) : '–' }}</strong>
           <span class="metric__hint">{{ uvInfo.label }}</span>
         </div>
