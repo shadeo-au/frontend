@@ -40,3 +40,6 @@ install.cmd
 
 *.md
 *.env
+*.pdf
+*.docx
+*.xlsx
