@@ -23,8 +23,8 @@ onBeforeUnmount(() => {
 const links = [
   { label: 'Home', href: '/#hero', path: '/', hash: '#hero' },
   { label: 'Why', href: '/why', path: '/why' },
-  { label: 'Cool Routes', href: '/#navigation', path: '/', hash: '#navigation' },
-  { label: 'Awareness Map', href: '/#awareness', path: '/', hash: '#awareness' },
+  { label: 'Walk Planner', href: '/walk-planner', path: '/walk-planner' },
+  { label: 'Awareness Map', href: '/awareness', path: '/awareness' },
   { label: 'Self-Check', href: '/#self-check', path: '/', hash: '#self-check' },
 ];
 
@@ -34,7 +34,7 @@ const closeMenu = () => {
 
 const isActive = (link: { path: string; hash?: string }) => {
   if (route.path !== link.path) return false;
-  if (link.path === '/why') return true;
+  if (link.path === '/why' || link.path === '/awareness' || link.path === '/walk-planner') return true;
   if (!link.hash) return route.hash === '';
   return route.hash === link.hash || (link.hash === '#hero' && route.hash === '');
 };

@@ -180,7 +180,7 @@ onBeforeUnmount(() => {/* io cleaned up via unobserve */});
                 can affect where extra care may be needed.
               </p>
               <div class="ws-feature-panel__action">
-                <AppButton href="/#awareness" variant="feature">View awareness section</AppButton>
+                <AppButton href="/awareness" variant="feature">View awareness map</AppButton>
               </div>
             </div>
 

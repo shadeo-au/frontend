@@ -1,0 +1,59 @@
+{
+  "carlton-vic-3053": [
+    { "id": "lib-carlton", "name": "Kathleen Syme Library", "type": "library", "lat": -37.7993, "lng": 144.9669, "distance_m": 320, "open_hours": "Mon–Fri 10:00–20:00, Sat 10:00–17:00", "features": ["Free Wi-Fi", "Air conditioned", "Drinking fountain"] },
+    { "id": "cc-carlton-baths", "name": "Carlton Baths Community Centre", "type": "community_centre", "lat": -37.8013, "lng": 144.9722, "distance_m": 580, "open_hours": "Mon–Fri 09:00–20:00", "features": ["Air conditioned", "Seating area"] },
+    { "id": "park-carlton-gardens", "name": "Carlton Gardens", "type": "park", "lat": -37.8053, "lng": 144.9711, "distance_m": 720, "open_hours": "Open 24h", "features": ["Tree shade", "Drinking fountain", "Public toilet"] },
+    { "id": "mall-melbourne-central", "name": "Melbourne Central", "type": "shopping_centre", "lat": -37.8104, "lng": 144.9628, "distance_m": 950, "open_hours": "Daily 10:00–19:00", "features": ["Air conditioned", "Public seating", "Food court"] },
+    { "id": "lib-state", "name": "State Library Victoria", "type": "library", "lat": -37.8098, "lng": 144.9652, "distance_m": 980, "open_hours": "Daily 10:00–18:00", "features": ["Free Wi-Fi", "Air conditioned", "Quiet reading room"] }
+  ],
+  "brunswick-vic-3056": [
+    { "id": "lib-brunswick", "name": "Brunswick Library", "type": "library", "lat": -37.7676, "lng": 144.9605, "distance_m": 180, "open_hours": "Mon–Fri 10:00–20:00, Sat 10:00–17:00", "features": ["Free Wi-Fi", "Air conditioned", "Drinking fountain"] },
+    { "id": "cc-brunswick-town-hall", "name": "Brunswick Town Hall", "type": "community_centre", "lat": -37.7691, "lng": 144.9596, "distance_m": 290, "open_hours": "Mon–Fri 09:00–17:00", "features": ["Air conditioned", "Public seating"] },
+    { "id": "park-gilpin", "name": "Gilpin Park", "type": "park", "lat": -37.7714, "lng": 144.9608, "distance_m": 510, "open_hours": "Open 24h", "features": ["Tree shade", "Drinking fountain"] },
+    { "id": "mall-barkly-square", "name": "Barkly Square", "type": "shopping_centre", "lat": -37.7654, "lng": 144.9627, "distance_m": 320, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned", "Food court"] }
+  ],
+  "melbourne-vic-3000": [
+    { "id": "lib-state", "name": "State Library Victoria", "type": "library", "lat": -37.8098, "lng": 144.9652, "distance_m": 280, "open_hours": "Daily 10:00–18:00", "features": ["Free Wi-Fi", "Air conditioned", "Quiet reading room"] },
+    { "id": "lib-cml", "name": "City Library", "type": "library", "lat": -37.8138, "lng": 144.9678, "distance_m": 160, "open_hours": "Mon–Fri 09:00–20:00, Sat–Sun 11:00–17:00", "features": ["Free Wi-Fi", "Air conditioned", "Café"] },
+    { "id": "mall-melbourne-central", "name": "Melbourne Central", "type": "shopping_centre", "lat": -37.8104, "lng": 144.9628, "distance_m": 240, "open_hours": "Daily 10:00–19:00", "features": ["Air conditioned", "Public seating", "Food court"] },
+    { "id": "park-flagstaff", "name": "Flagstaff Gardens", "type": "park", "lat": -37.8118, "lng": 144.9543, "distance_m": 590, "open_hours": "Open 24h", "features": ["Tree shade", "Drinking fountain", "Public toilet"] },
+    { "id": "cc-kathleen-syme", "name": "Kathleen Syme Community Hub", "type": "community_centre", "lat": -37.7993, "lng": 144.9669, "distance_m": 980, "open_hours": "Mon–Fri 10:00–20:00", "features": ["Free Wi-Fi", "Air conditioned"] }
+  ],
+  "footscray-vic-3011": [
+    { "id": "lib-footscray", "name": "Footscray Library", "type": "library", "lat": -37.8018, "lng": 144.9001, "distance_m": 230, "open_hours": "Mon–Fri 10:00–19:00, Sat 10:00–17:00", "features": ["Free Wi-Fi", "Air conditioned"] },
+    { "id": "cc-footscray-cch", "name": "Footscray Community Arts Centre", "type": "community_centre", "lat": -37.8081, "lng": 144.9023, "distance_m": 940, "open_hours": "Mon–Fri 09:00–17:00", "features": ["Air conditioned", "Café"] },
+    { "id": "mall-highpoint", "name": "Highpoint Shopping Centre", "type": "shopping_centre", "lat": -37.7775, "lng": 144.8916, "distance_m": 2400, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned", "Food court", "Public seating"] },
+    { "id": "park-footscray", "name": "Footscray Park", "type": "park", "lat": -37.7910, "lng": 144.9003, "distance_m": 980, "open_hours": "Open 24h", "features": ["Tree shade", "Drinking fountain"] }
+  ],
+  "box-hill-vic-3128": [
+    { "id": "lib-boxhill", "name": "Box Hill Library", "type": "library", "lat": -37.8203, "lng": 145.1241, "distance_m": 90, "open_hours": "Mon–Fri 09:30–20:00, Sat 10:00–17:00", "features": ["Free Wi-Fi", "Air conditioned"] },
+    { "id": "mall-boxhillcentral", "name": "Box Hill Central", "type": "shopping_centre", "lat": -37.8190, "lng": 145.1218, "distance_m": 250, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned", "Food court"] },
+    { "id": "cc-whitehorse", "name": "Whitehorse Centre", "type": "community_centre", "lat": -37.8233, "lng": 145.1311, "distance_m": 690, "open_hours": "Mon–Fri 09:00–17:00", "features": ["Air conditioned", "Public seating"] },
+    { "id": "park-boxhillgardens", "name": "Box Hill Gardens", "type": "park", "lat": -37.8234, "lng": 145.1208, "distance_m": 470, "open_hours": "Open 24h", "features": ["Tree shade", "Drinking fountain", "Public toilet"] }
+  ],
+  "frankston-vic-3199": [
+    { "id": "lib-frankston", "name": "Frankston Library", "type": "library", "lat": -38.1426, "lng": 145.1229, "distance_m": 160, "open_hours": "Mon–Fri 09:00–20:00, Sat 09:00–17:00", "features": ["Free Wi-Fi", "Air conditioned"] },
+    { "id": "mall-bayside", "name": "Bayside Shopping Centre", "type": "shopping_centre", "lat": -38.1448, "lng": 145.1240, "distance_m": 410, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned", "Food court"] },
+    { "id": "park-frankston-foreshore", "name": "Frankston Foreshore Reserve", "type": "park", "lat": -38.1393, "lng": 145.1240, "distance_m": 360, "open_hours": "Open 24h", "features": ["Tree shade", "Sea breeze", "Public toilet"] }
+  ],
+  "werribee-vic-3030": [
+    { "id": "lib-werribee", "name": "Werribee Library", "type": "library", "lat": -37.9009, "lng": 144.6585, "distance_m": 110, "open_hours": "Mon–Fri 09:30–19:00, Sat 09:30–13:00", "features": ["Free Wi-Fi", "Air conditioned"] },
+    { "id": "mall-werribeeplaza", "name": "Pacific Werribee", "type": "shopping_centre", "lat": -37.8973, "lng": 144.6936, "distance_m": 3200, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned", "Food court"] }
+  ],
+  "glen-waverley-vic-3150": [
+    { "id": "lib-glenwaverley", "name": "Glen Waverley Library", "type": "library", "lat": -37.8783, "lng": 145.1640, "distance_m": 130, "open_hours": "Mon–Fri 09:30–20:00, Sat 09:30–17:00", "features": ["Free Wi-Fi", "Air conditioned"] },
+    { "id": "mall-thecentral", "name": "The Glen Shopping Centre", "type": "shopping_centre", "lat": -37.8772, "lng": 145.1632, "distance_m": 150, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned", "Food court"] },
+    { "id": "park-bogong", "name": "Bogong Reserve", "type": "park", "lat": -37.8810, "lng": 145.1668, "distance_m": 470, "open_hours": "Open 24h", "features": ["Tree shade", "Drinking fountain"] }
+  ],
+  "st-kilda-vic-3182": [
+    { "id": "lib-stkilda", "name": "St Kilda Library", "type": "library", "lat": -37.8674, "lng": 144.9805, "distance_m": 80, "open_hours": "Mon–Fri 09:00–20:00, Sat 10:00–17:00", "features": ["Free Wi-Fi", "Air conditioned"] },
+    { "id": "cc-stkilda-th", "name": "St Kilda Town Hall", "type": "community_centre", "lat": -37.8666, "lng": 144.9826, "distance_m": 230, "open_hours": "Mon–Fri 09:00–17:00", "features": ["Air conditioned"] },
+    { "id": "park-catani", "name": "Catani Gardens", "type": "park", "lat": -37.8650, "lng": 144.9742, "distance_m": 670, "open_hours": "Open 24h", "features": ["Tree shade", "Sea breeze", "Public toilet"] },
+    { "id": "mall-acland-court", "name": "Acland Court Shopping Centre", "type": "shopping_centre", "lat": -37.8665, "lng": 144.9786, "distance_m": 290, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned"] }
+  ],
+  "sunshine-vic-3020": [
+    { "id": "lib-sunshine", "name": "Sunshine Library", "type": "library", "lat": -37.7884, "lng": 144.8327, "distance_m": 60, "open_hours": "Mon–Fri 09:30–19:00, Sat 09:30–17:00", "features": ["Free Wi-Fi", "Air conditioned"] },
+    { "id": "mall-sunshinemarket", "name": "Sunshine Marketplace", "type": "shopping_centre", "lat": -37.7861, "lng": 144.8400, "distance_m": 670, "open_hours": "Daily 09:00–18:00", "features": ["Air conditioned", "Food court"] },
+    { "id": "park-vmt-reserve", "name": "Victoria Memorial Park", "type": "park", "lat": -37.7920, "lng": 144.8320, "distance_m": 410, "open_hours": "Open 24h", "features": ["Tree shade", "Drinking fountain"] }
+  ]
+}

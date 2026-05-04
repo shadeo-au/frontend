@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <PageSection id="navigation" tone="lime" side-label="Section 02 - Cool Routes">
+      <PageSection id="navigation" tone="lime" side-label="Section 02 - Walk Planner">
         <template #copy>
           <SectionKicker>Cool routes for daily needs</SectionKicker>
           <h2>Find a nearby place, then choose the safer walk.</h2>
@@ -202,7 +202,7 @@ onBeforeUnmount(() => {
             route using distance, shade cover, and rest facilities.
           </p>
           <div class="section-actions">
-            <AppButton href="#awareness" variant="feature">View Heat Map</AppButton>
+            <AppButton href="/walk-planner" variant="feature">Open Walk Planner</AppButton>
           </div>
         </template>
 

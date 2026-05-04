@@ -10,6 +10,22 @@ const routes: RouteRecordRaw[] = [
     path: '/why',
     component: () => import('../pages/WhyPage.vue'),
   },
+  {
+    path: '/awareness',
+    component: () => import('../pages/AwarenessPage.vue'),
+  },
+  {
+    path: '/walk-planner',
+    component: () => import('../pages/WalkPlannerPage.vue'),
+  },
+  {
+    path: '/cool-routes',
+    redirect: '/walk-planner',
+  },
+  {
+    path: '/planner',
+    redirect: '/walk-planner',
+  },
 ]
 
 export const router = createRouter({
