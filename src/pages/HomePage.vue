@@ -45,8 +45,14 @@ const setupSectionScroller = () => {
   let currentIndex = getNearestSectionIndex();
   let isAnimating = false;
   let animationFrame = 0;
-  let wheelRemainder = 0;
-  let suppressWheelUntil = 0;
+
+  // Inertia-decay detection state
+  // After a page turn we record the peak deltaY of that gesture.
+  // Events whose magnitude is clearly decaying (< peak * 0.8) are inertia tail — ignore them.
+  // Only a genuinely new gesture (gap > 100 ms, or deltaY surpasses the old peak) resets state.
+  let gesturePeak = 0;        // peak |deltaY| seen during the current gesture
+  let gestureTriggered = false; // true once this gesture has already caused a page turn
+  let lastWheelTime = 0;
 
   const animateTo = (targetIndex: number) => {
     const target = document.getElementById(sectionIds[targetIndex]);
@@ -70,8 +76,6 @@ const setupSectionScroller = () => {
         animationFrame = window.requestAnimationFrame(frame);
       } else {
         isAnimating = false;
-        wheelRemainder = 0;
-        suppressWheelUntil = performance.now() + 180;
       }
     };
 
@@ -84,18 +88,45 @@ const setupSectionScroller = () => {
     if (event.ctrlKey) return;
 
     event.preventDefault();
-    if (isAnimating || performance.now() < suppressWheelUntil) {
-      wheelRemainder = 0;
-      return;
+
+    const now = performance.now();
+    const absDelta = Math.abs(event.deltaY);
+
+    // A gap > 100 ms means a brand-new gesture — reset everything.
+    if (now - lastWheelTime > 100) {
+      gesturePeak = 0;
+      gestureTriggered = false;
+    }
+    lastWheelTime = now;
+
+    // Track the peak magnitude of the current gesture.
+    if (absDelta > gesturePeak) gesturePeak = absDelta;
+
+    if (gestureTriggered) {
+      // We already flipped for this gesture.
+      // Allow a new gesture only if delta surged significantly above the old peak
+      // (user started a fresh strong swipe before inertia fully stopped).
+      if (absDelta > gesturePeak * 0.9 && absDelta > 30) {
+        // Looks like a new intentional swipe — reset and fall through.
+        gesturePeak = absDelta;
+        gestureTriggered = false;
+      } else {
+        // Still inertia tail — ignore.
+        return;
+      }
     }
 
-    wheelRemainder += event.deltaY;
-    if (Math.abs(wheelRemainder) < 42) return;
+    // Require a minimum intentional delta before firing.
+    // deltaMode 0 = pixels (trackpad), deltaMode 1/2 = lines/pages (mouse wheel).
+    const threshold = event.deltaMode === 0 ? 30 : 20;
+    if (absDelta < threshold) return;
 
+    if (isAnimating) return;
+
+    gestureTriggered = true;
     currentIndex = getNearestSectionIndex();
-    const direction = wheelRemainder > 0 ? 1 : -1;
+    const direction = event.deltaY > 0 ? 1 : -1;
     const nextIndex = Math.max(0, Math.min(sectionIds.length - 1, currentIndex + direction));
-    wheelRemainder = 0;
     animateTo(nextIndex);
   };
 
