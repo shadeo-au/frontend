@@ -195,7 +195,7 @@ onBeforeUnmount(() => {/* io cleaned up via unobserve */});
                 mobility, and check-in support in a non-medical way.
               </p>
               <div class="ws-feature-panel__action">
-                <AppButton href="/#self-check" variant="feature">Start self-check</AppButton>
+                <AppButton href="/self-check" variant="feature">Start Self-Check</AppButton>
               </div>
             </div>
 

@@ -200,7 +200,7 @@ onBeforeUnmount(() => {/* io cleaned up via unobserve */});
             <span>02</span>
             <h3>Check personal risk</h3>
             <p>Combine area conditions with health, home cooling, mobility, and support.</p>
-            <AppButton href="/#self-check" variant="feature">Self-Check</AppButton>
+            <AppButton href="/self-check" variant="feature">Start Self-Check</AppButton>
           </article>
         </div>
       </section>

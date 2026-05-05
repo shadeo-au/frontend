@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw } from 'vue';
 
 type HviProperties = {
   HVI_2018: number | null;
@@ -186,17 +186,24 @@ const selectLayer = (layer: LeafletLayer, shouldZoom = false) => {
 
   if (shouldZoom && layer.getBounds) {
     map?.fitBounds(layer.getBounds(), {
-      padding: [30, 30],
-      maxZoom: 13,
+      padding: [40, 40],
+      maxZoom: 14,
       animate: true,
+      duration: 0.8,
     });
   }
 };
 
 const findLayerForFeature = (feature: RawFeature) => {
+  const target = toRaw(feature);
   let matched: LeafletLayer | undefined;
   geoJsonLayer?.eachLayer((layer) => {
-    if (layer.feature === feature) matched = layer;
+    if (
+      layer.feature === target ||
+      layer.feature?.properties.LOCALITY === feature.properties.LOCALITY
+    ) {
+      matched = layer;
+    }
   });
   return matched;
 };
@@ -284,17 +291,49 @@ const updateLabelBand = () => {
   else labelBand.value = 'detail';
 };
 
+const fitMapToFeature = (feature: RawFeature) => {
+  const leaflet = window.L;
+  if (!map || !leaflet) return;
+
+  const geometry = feature.geometry as {
+    type: 'Polygon' | 'MultiPolygon';
+    coordinates: number[][][] | number[][][][];
+  };
+  const rings = geometry.type === 'Polygon'
+    ? (geometry.coordinates as number[][][])
+    : (geometry.coordinates as number[][][][]).flat();
+
+  const latLngs: [number, number][] = [];
+  rings.forEach((ring) => {
+    ring.forEach((point) => latLngs.push([point[1], point[0]]));
+  });
+  if (!latLngs.length) return;
+
+  const bounds = leaflet.polygon(latLngs).getBounds();
+  map.fitBounds(bounds, {
+    padding: [40, 40],
+    maxZoom: 14,
+    animate: true,
+    duration: 0.8,
+  });
+};
+
 const chooseSuggestion = (feature: RawFeature) => {
   const layer = findLayerForFeature(feature);
   if (layer) {
-    selectLayer(layer, true);
-    return;
+    selectLayer(layer, false);
+  } else {
+    selectedFeature.value = feature;
+    search.value = feature.properties.LOCALITY;
+    showSuggestions.value = false;
+    status.value = `Selected ${feature.properties.LOCALITY}.`;
   }
+  fitMapToFeature(feature);
+};
 
-  selectedFeature.value = feature;
-  search.value = feature.properties.LOCALITY;
-  showSuggestions.value = false;
-  status.value = `Selected ${feature.properties.LOCALITY}.`;
+const onSearchEnter = () => {
+  const first = suggestions.value[0];
+  if (first) chooseSuggestion(first);
 };
 
 const resetView = () => {
@@ -354,7 +393,7 @@ const setupMap = async () => {
             if (hovered !== selectedLayer) geoJsonLayer?.resetStyle(hovered);
           },
           click: ({ target: clicked }) => {
-            selectLayer(clicked);
+            selectLayer(clicked, true);
           },
         });
       },
@@ -418,6 +457,7 @@ onBeforeUnmount(() => {
           autocomplete="off"
           @focus="showSuggestions = true"
           @input="showSuggestions = true"
+          @keydown.enter.prevent="onSearchEnter"
         />
         <div v-if="showSuggestions && suggestions.length" class="hvi-map__suggestions">
           <button
