@@ -223,7 +223,7 @@ onBeforeUnmount(() => {
             need more care before a hot day becomes risky.
           </p>
           <div class="section-actions">
-            <AppButton href="#self-check" variant="feature">Start Self-Check</AppButton>
+            <AppButton href="/awareness" variant="feature">View Awareness Map</AppButton>
           </div>
         </template>
 
@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
             practical.
           </p>
           <div class="section-actions">
-            <AppButton href="#hero" variant="feature">Back to Top</AppButton>
+            <AppButton href="/self-check" variant="feature">Start Self-Check</AppButton>
           </div>
         </template>
 
