@@ -46,6 +46,7 @@ const setupSectionScroller = () => {
   let isAnimating = false;
   let animationFrame = 0;
   let wheelRemainder = 0;
+  let suppressWheelUntil = 0;
 
   const animateTo = (targetIndex: number) => {
     const target = document.getElementById(sectionIds[targetIndex]);
@@ -70,6 +71,7 @@ const setupSectionScroller = () => {
       } else {
         isAnimating = false;
         wheelRemainder = 0;
+        suppressWheelUntil = performance.now() + 180;
       }
     };
 
@@ -79,9 +81,13 @@ const setupSectionScroller = () => {
   const onWheel = (event: WheelEvent) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, [data-native-scroll]')) return;
+    if (event.ctrlKey) return;
 
     event.preventDefault();
-    if (isAnimating) return;
+    if (isAnimating || performance.now() < suppressWheelUntil) {
+      wheelRemainder = 0;
+      return;
+    }
 
     wheelRemainder += event.deltaY;
     if (Math.abs(wheelRemainder) < 42) return;
