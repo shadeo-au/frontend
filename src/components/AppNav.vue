@@ -1,56 +1,165 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import AppButton from './AppButton.vue';
 
 const route = useRoute();
 const scrolled = ref(false);
 const open = ref(false);
+const aboutOpen = ref(false);
+const aboutPinned = ref(false);
+const mobileAboutOpen = ref(false);
+const aboutRef = ref<HTMLElement | null>(null);
+let aboutCloseTimer = 0;
 
 const onScroll = () => {
   scrolled.value = window.scrollY > 18;
 };
 
+const clearAboutCloseTimer = () => {
+  window.clearTimeout(aboutCloseTimer);
+};
+
+const closeAbout = () => {
+  clearAboutCloseTimer();
+  aboutOpen.value = false;
+  aboutPinned.value = false;
+};
+
+const onDocumentPointerDown = (event: PointerEvent) => {
+  const target = event.target as Node | null;
+  if (target && aboutRef.value?.contains(target)) return;
+  closeAbout();
+};
+
 onMounted(() => {
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
+  document.addEventListener('pointerdown', onDocumentPointerDown);
 });
 
 onBeforeUnmount(() => {
+  clearAboutCloseTimer();
   window.removeEventListener('scroll', onScroll);
+  document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
 
+const aboutLinks = [
+  { label: 'About Us', href: '/about-us', path: '/about-us' },
+  { label: 'Why This Matters', href: '/why', path: '/why' },
+];
+
 const links = [
-  { label: 'Home', href: '/#hero', path: '/', hash: '#hero' },
-  { label: 'Why', href: '/why', path: '/why' },
-  { label: 'Walk Planner', href: '/walk-planner', path: '/walk-planner' },
   { label: 'Awareness Map', href: '/awareness', path: '/awareness' },
+  { label: 'Walk Planner', href: '/walk-planner', path: '/walk-planner' },
   { label: 'Self-Check', href: '/self-check', path: '/self-check' },
 ];
 
 const closeMenu = () => {
   open.value = false;
+  mobileAboutOpen.value = false;
+};
+
+const openAbout = () => {
+  clearAboutCloseTimer();
+  aboutOpen.value = true;
+};
+
+const scheduleCloseAbout = () => {
+  if (aboutPinned.value) return;
+  clearAboutCloseTimer();
+  aboutCloseTimer = window.setTimeout(() => {
+    aboutOpen.value = false;
+  }, 240);
+};
+
+const toggleAbout = () => {
+  clearAboutCloseTimer();
+  if (aboutOpen.value && aboutPinned.value) {
+    closeAbout();
+    return;
+  }
+
+  aboutPinned.value = true;
+  aboutOpen.value = true;
+};
+
+const onAboutFocusout = (event: FocusEvent) => {
+  const next = event.relatedTarget as HTMLElement | null;
+  if (next && (event.currentTarget as HTMLElement).contains(next)) return;
+  scheduleCloseAbout();
+};
+
+const onAboutKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    closeAbout();
+    return;
+  }
+
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    toggleAbout();
+  }
 };
 
 const isActive = (link: { path: string; hash?: string }) => {
   if (route.path !== link.path) return false;
-  if (
-    link.path === '/why' ||
-    link.path === '/awareness' ||
-    link.path === '/walk-planner' ||
-    link.path === '/self-check'
-  ) return true;
+  if (link.path === '/awareness' || link.path === '/walk-planner' || link.path === '/self-check') return true;
   if (!link.hash) return route.hash === '';
   return route.hash === link.hash || (link.hash === '#hero' && route.hash === '');
 };
+
+const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
 </script>
 
 <template>
   <header :class="['nav', { 'nav--scrolled': scrolled }]">
     <div class="nav__inner">
-      <a href="/#hero" class="brand" aria-label="Shadeo home" @click="closeMenu">Shadeo</a>
+      <a href="/#hero" class="brand" aria-label="Shadeo home" @click="closeMenu">
+        <img src="/logo.png" alt="Shadeo" />
+      </a>
 
       <nav class="nav__links" aria-label="Primary">
+        <div
+          ref="aboutRef"
+          class="nav__item nav__item--dropdown"
+          @pointerenter="openAbout"
+          @pointerleave="scheduleCloseAbout"
+          @focusout="onAboutFocusout"
+        >
+          <button
+            type="button"
+            :class="['nav__link', 'nav__link--button', { 'is-active': isAboutActive(), 'is-open': aboutOpen }]"
+            aria-haspopup="true"
+            :aria-expanded="aboutOpen"
+            aria-controls="about-menu"
+            @click="toggleAbout"
+            @keydown="onAboutKeydown"
+          >
+            About
+            <span class="nav__chevron" aria-hidden="true" />
+          </button>
+
+          <div
+            id="about-menu"
+            :class="['nav__dropdown', { 'is-open': aboutOpen }]"
+            role="menu"
+            @pointerenter="openAbout"
+            @pointerleave="scheduleCloseAbout"
+            @keydown.esc.stop="closeAbout"
+          >
+            <a
+              v-for="link in aboutLinks"
+              :key="link.href"
+              :href="link.href"
+              :class="['nav__dropdown-link', { 'is-active': isActive(link) }]"
+              role="menuitem"
+              @click="closeAbout"
+            >
+              {{ link.label }}
+            </a>
+          </div>
+        </div>
+
         <a
           v-for="link in links"
           :key="link.href"
@@ -74,6 +183,28 @@ const isActive = (link: { path: string; hash?: string }) => {
     </div>
 
     <div :class="['nav__sheet', { 'is-open': open }]">
+      <button
+        type="button"
+        :class="['nav__sheet-link', 'nav__sheet-link--button', { 'is-active': isAboutActive() }]"
+        :aria-expanded="mobileAboutOpen"
+        aria-controls="mobile-about-menu"
+        @click="mobileAboutOpen = !mobileAboutOpen"
+      >
+        About
+        <span class="nav__chevron" aria-hidden="true" />
+      </button>
+      <div id="mobile-about-menu" :class="['nav__sheet-children', { 'is-open': mobileAboutOpen }]">
+        <a
+          v-for="link in aboutLinks"
+          :key="link.href"
+          :href="link.href"
+          :class="['nav__sheet-link', 'nav__sheet-link--child', { 'is-active': isActive(link) }]"
+          @click="closeMenu"
+        >
+          {{ link.label }}
+        </a>
+      </div>
+
       <a
         v-for="link in links"
         :key="link.href"
@@ -90,7 +221,7 @@ const isActive = (link: { path: string; hash?: string }) => {
 <style scoped>
 .nav {
   position: fixed;
-  inset: 24px 0 auto;
+  inset: 8px 0 auto;
   z-index: var(--z-nav);
   pointer-events: none;
 }
@@ -122,11 +253,17 @@ const isActive = (link: { path: string; hash?: string }) => {
 }
 
 .brand {
-  color: var(--brand-ink-soft);
-  font-family: var(--font-body);
-  font-size: 1.35rem;
-  font-weight: 900;
-  letter-spacing: 0;
+  width: 130px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand img {
+  width: 100%;
+  height: auto;
+  max-height: 48px;
+  object-fit: contain;
 }
 
 .nav__links {
@@ -136,10 +273,20 @@ const isActive = (link: { path: string; hash?: string }) => {
   gap: 6px;
 }
 
+.nav__item {
+  position: relative;
+}
+
+.nav__item--dropdown {
+  padding-bottom: 16px;
+  margin-bottom: -16px;
+}
+
 .nav__link {
   min-height: var(--brand-touch);
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 0 16px;
   border-radius: var(--r-pill);
   color: var(--brand-ink-muted);
@@ -150,10 +297,74 @@ const isActive = (link: { path: string; hash?: string }) => {
     background-color var(--d-fast) ease;
 }
 
+.nav__link--button {
+  background: transparent;
+}
+
 .nav__link:hover,
 .nav__link.is-active {
   color: #23342a;
   background: rgba(155, 224, 111, 0.24);
+}
+
+.nav__chevron {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  border-right: 4px solid currentColor;
+  border-bottom: 4px solid currentColor;
+  border-radius: 2px;
+  transform: translateY(-3px) rotate(45deg);
+  transition: transform var(--d-fast) ease;
+}
+
+.nav__link.is-open .nav__chevron,
+.nav__sheet-link[aria-expanded="true"] .nav__chevron {
+  transform: translateY(3px) rotate(225deg);
+}
+
+.nav__dropdown {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 0;
+  z-index: 2;
+  min-width: 210px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(252, 247, 235, 0.98);
+  border: 1px solid var(--brand-line);
+  box-shadow: 0 24px 56px -34px rgba(35, 45, 39, 0.45);
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition:
+    opacity var(--d-fast) ease,
+    transform var(--d-fast) ease;
+}
+
+.nav__dropdown.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.nav__dropdown-link {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 13px;
+  color: var(--brand-ink-muted);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.nav__dropdown-link:hover,
+.nav__dropdown-link.is-active {
+  color: var(--brand-ink-soft);
+  background: rgba(155, 224, 111, 0.22);
 }
 
 .nav__cta {
@@ -219,11 +430,18 @@ const isActive = (link: { path: string; hash?: string }) => {
   min-height: 56px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 13px 16px;
   border-radius: 16px;
   color: var(--brand-ink-muted);
   font-size: 1.125rem;
   font-weight: 800;
+}
+
+.nav__sheet-link--button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
 }
 
 .nav__sheet-link:hover {
@@ -234,6 +452,24 @@ const isActive = (link: { path: string; hash?: string }) => {
 .nav__sheet-link.is-active {
   color: var(--brand-ink-soft);
   background: rgba(155, 224, 111, 0.24);
+}
+
+.nav__sheet-children {
+  display: none;
+  gap: 8px;
+  padding: 0 0 2px 14px;
+}
+
+.nav__sheet-children.is-open {
+  display: grid;
+}
+
+.nav__sheet-link--child {
+  min-height: 48px;
+  justify-content: flex-start;
+  border-radius: 14px;
+  font-size: 1.02rem;
+  background: rgba(255, 255, 255, 0.42);
 }
 
 @media (max-width: 980px) {
@@ -255,7 +491,7 @@ const isActive = (link: { path: string; hash?: string }) => {
 
 @media (max-width: 640px) {
   .nav {
-    inset-block-start: 14px;
+    inset-block-start: 6px;
   }
 
   .nav__inner {
@@ -265,7 +501,7 @@ const isActive = (link: { path: string; hash?: string }) => {
   }
 
   .brand {
-    font-size: 1.25rem;
+    width: 116px;
   }
 
   .nav__sheet {

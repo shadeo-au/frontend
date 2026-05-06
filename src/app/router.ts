@@ -11,6 +11,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/WhyPage.vue'),
   },
   {
+    path: '/about-us',
+    component: () => import('../pages/AboutPage.vue'),
+  },
+  {
     path: '/awareness',
     component: () => import('../pages/AwarenessPage.vue'),
   },
@@ -29,6 +33,10 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/planner',
     redirect: '/walk-planner',
+  },
+  {
+    path: '/about',
+    redirect: '/about-us',
   },
 ]
 
