@@ -14,11 +14,12 @@ onMounted(() => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           entry.target.classList.add('is-in');
-          observer?.unobserve(entry.target);
+        } else {
+          entry.target.classList.remove('is-in');
         }
       });
     },
-    { threshold: 0.12 }
+    { rootMargin: '-8% 0px -14% 0px', threshold: 0.16 }
   );
 
   els.forEach((el) => observer?.observe(el));
@@ -35,8 +36,8 @@ onBeforeUnmount(() => {
 
     <main>
       <section id="about-hero" class="about-hero">
-        <div class="about-hero__copy" data-rise>
-          <h1>Comfort,<em>every age.</em></h1>
+        <div class="about-hero__copy" data-rise="fade-scale">
+          <h1>Comfort,<em>all summer.</em></h1>
         </div>
         <div class="about-hero__media" aria-hidden="true">
           <img src="/aboutus-1.jpg" alt="" />
@@ -45,44 +46,84 @@ onBeforeUnmount(() => {
 
       <AboutSubNav />
 
-      <section id="purpose-mission" class="purpose-showcase">
+      <section id="mission" class="purpose-showcase">
         <div class="purpose-showcase__media" aria-hidden="true">
           <img src="/aboutus-2.jpg" alt="" />
         </div>
-        <div class="purpose-showcase__copy" data-rise>
-          <div id="purpose" class="purpose-showcase__statement">
+        <div class="purpose-showcase__copy" data-rise="fade-left">
+          <div class="purpose-showcase__statement">
             <h2><em>We believe</em></h2>
-            <p>summer should belong to everyone - at every age.</p>
+            <p>hot days should feel <em>manageable, familiar, and safe.</em></p>
           </div>
-          <div id="mission" class="purpose-showcase__statement">
+          <div class="purpose-showcase__statement">
             <h2><em>Our mission</em></h2>
             <p>is to help older Australians face heat with clarity, calm, and confidence.</p>
           </div>
         </div>
       </section>
 
-      <section id="approach" class="about-section about-section--split">
-        <div class="about-section__copy" data-rise>
-          <h2>Help, <em>not hype.</em></h2>
-          <p>
-            Shadeo uses simple language, local context, and respectful guidance. Every map,
-            result, and page is built to inform without alarming, guide without lecturing,
-            and support without watching.
-          </p>
-          <p>
-            We do not ask you to log in. We do not store your details. We give you what
-            you need - clearly, locally, and at your own pace.
+      <section id="approach" class="about-section about-section--approach">
+        <div class="about-approach__head" data-rise="fade-up">
+          <h2>Help, <em class="no-wrap">not hype.</em></h2>
+          <p class="about-approach__lede">
+            Heat does not land the same on every street, in every neighbourhood,
+            or for every person. Shadeo helps with all three.
           </p>
         </div>
-        <div class="about-section__image" data-rise style="--rise-delay: 90ms">
-          <img src="/awarenesspage.png" alt="A warm illustration of older people, local places, and care planning." />
-        </div>
+
+        <ol class="about-approach__list">
+          <li class="approach-item approach-item--01" data-rise="fade-right">
+            <span class="approach-item__num" aria-hidden="true">01</span>
+            <div class="approach-item__body">
+              <h3>Cooler routes through <em>your day.</em></h3>
+              <p>
+                Walking guidance that prefers shade, rest stops, and cool places -
+                so a trip to the shops, the library, or a friend's place stays
+                comfortable on a warm day.
+              </p>
+            </div>
+          </li>
+
+          <li class="approach-item approach-item--02" data-rise="fade-left" style="--rise-delay: 90ms">
+            <span class="approach-item__num" aria-hidden="true">02</span>
+            <div class="approach-item__body">
+              <h3>A clearer picture of your <em>neighbourhood.</em></h3>
+              <p>
+                See how heat settles around you - where streets run hotter,
+                where green cover thins out, and where the cooler corners are
+                within easy reach.
+              </p>
+            </div>
+          </li>
+
+          <li class="approach-item approach-item--03" data-rise="fade-right" style="--rise-delay: 180ms">
+            <span class="approach-item__num" aria-hidden="true">03</span>
+            <div class="approach-item__body">
+              <h3>How heat lands for <em>you.</em></h3>
+              <p>
+                A few quiet questions about your home, your routine, and the
+                support around you turn today's forecast into clear, personal
+                next steps - not generic advice.
+              </p>
+            </div>
+          </li>
+        </ol>
+
       </section>
 
       <section id="values" class="about-section about-section--values">
-        <div class="about-section__copy about-section__copy--center" data-rise>
+        <div class="about-values__image about-values__image--left" aria-hidden="true">
+          <img src="/aboutus-3-1.jpg" alt="" />
+        </div>
+        <div class="about-values__image about-values__image--right" aria-hidden="true">
+          <img src="/aboutus-3-2.jpg" alt="" />
+        </div>
+        <div class="about-section__copy about-section__copy--center" data-rise="fade-scale">
           <h2>Five words to <em>live by.</em></h2>
-          <p><strong>Calm, Care, Local, Private, Practical</strong> - the principles behind every choice we make.</p>
+          <p class="about-values__principles">
+            <strong>Calm, Care, Local, Private, Practical</strong>
+            <span>the principles behind every choice we make.</span>
+          </p>
           <p>
             They mark the difference between feeling supported and feeling watched,
             between being prepared and being scared, between knowing your neighbourhood
@@ -93,29 +134,32 @@ onBeforeUnmount(() => {
 
       <ValueMarquee />
 
-      <section id="story" class="about-section about-section--photo about-section--story">
+      <section id="sustainability" class="about-section about-section--photo about-section--sustainability">
         <div class="about-section__bg" aria-hidden="true">
-          <img src="/awarenesspage.png" alt="" />
+          <img src="/aboutus-4.jpg" alt="" />
         </div>
-        <div class="about-section__copy" data-rise>
-          <span class="about-kicker">Why Shadeo exists</span>
-          <h2>As summers <em>change,</em> so do we.</h2>
-          <p>General heat advice talks to everyone, which means it talks to no one in particular.</p>
-          <p>
-            For older adults, heat lands differently - in the body, in the home,
-            in the daily routine. The information that exists rarely meets people
-            where they live.
-          </p>
-          <p>
-            Shadeo bridges that gap. Local data, personal context, simple language -
-            so summer can stay something to enjoy, not endure.
-          </p>
-          <a href="/why" class="about-inline-link">See the data behind why this matters -></a>
+        <div class="sustainability-layout" data-rise="fade-left">
+          <h2 class="sustainability-headline">
+            Keep life <em>liveable</em><br />
+            in <em class="no-wrap">later years.</em>
+          </h2>
+          <div class="sustainability-copy">
+            <p>General heat advice talks to everyone, which means it talks to no one in particular.</p>
+            <p>
+              As summers grow hotter, sustainable care means helping older adults
+              keep daily routines, local connections, and independence within reach.
+            </p>
+            <p>
+              Shadeo bridges that gap with local data, personal context, and simple
+              language - so warm days can feel planned for, not endured.
+            </p>
+            <a href="/why" class="about-inline-link">See the data behind why this matters -></a>
+          </div>
         </div>
       </section>
 
       <section id="inclusion" class="about-section about-section--inclusion">
-        <div class="about-section__copy about-section__copy--center" data-rise>
+        <div class="about-section__copy about-section__copy--center" data-rise="fade-up">
           <h2>Every age, <em>included.</em></h2>
           <p>
             At Shadeo, "older adults" is not a category - it is a future every one
@@ -130,34 +174,34 @@ onBeforeUnmount(() => {
       </section>
 
       <section id="explore" class="about-section about-section--explore">
-        <div class="about-section__head" data-rise>
+        <div class="about-section__head" data-rise="fade-scale">
           <h2>Now, <em>explore.</em></h2>
         </div>
 
         <div class="explore-grid">
-          <a href="/awareness" class="explore-card" data-rise>
-            <img src="/awareness.png" alt="" />
+          <a href="/awareness" class="explore-card" data-rise="fade-up">
+            <img src="/aboutus-c1.jpg" alt="" />
             <span>Awareness Map</span>
             <p>See where older residents may benefit from extra attention during heat.</p>
             <strong aria-hidden="true">-></strong>
           </a>
 
-          <a href="/self-check" class="explore-card" data-rise style="--rise-delay: 70ms">
-            <img src="/check-icon.png" alt="" />
+          <a href="/self-check" class="explore-card" data-rise="fade-up" style="--rise-delay: 70ms">
+            <img src="/aboutus-c2.jpg" alt="" />
             <span>Self-Check</span>
             <p>Reflect on your day, your home, and the support around you.</p>
             <strong aria-hidden="true">-></strong>
           </a>
 
-          <a href="/walk-planner" class="explore-card" data-rise style="--rise-delay: 140ms">
-            <img src="/route-icon.png" alt="" />
+          <a href="/walk-planner" class="explore-card" data-rise="fade-up" style="--rise-delay: 140ms">
+            <img src="/aboutus-c3.jpg" alt="" />
             <span>Walk Planner</span>
             <p>Compare cooler daily routes to nearby essential places.</p>
             <strong aria-hidden="true">-></strong>
           </a>
 
-          <a href="/why" class="explore-card" data-rise style="--rise-delay: 210ms">
-            <img src="/problem-icon1.png" alt="" />
+          <a href="/why" class="explore-card" data-rise="fade-up" style="--rise-delay: 210ms">
+            <img src="/aboutus-c4.jpg" alt="" />
             <span>Why This Matters</span>
             <p>Understand the evidence behind Shadeo's focus on older adults and heat.</p>
             <strong aria-hidden="true">-></strong>
@@ -179,16 +223,13 @@ onBeforeUnmount(() => {
   background: var(--brand-paper-white);
 }
 
-.about-page :target {
-  scroll-margin-top: calc(var(--nav-h) + 120px);
-}
-
 .about-hero,
 .about-section,
 .purpose-showcase {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  scroll-margin-top: calc(var(--nav-h) + 68px);
 }
 
 .about-hero {
@@ -317,6 +358,10 @@ onBeforeUnmount(() => {
   font-weight: 800;
 }
 
+.no-wrap {
+  white-space: nowrap;
+}
+
 .about-hero em {
   display: block;
   font-size: clamp(4.6rem, 10.2vw, 11rem);
@@ -385,7 +430,6 @@ onBeforeUnmount(() => {
 .purpose-showcase__statement {
   display: grid;
   gap: 12px;
-  scroll-margin-top: 150px;
 }
 
 .purpose-showcase__statement p {
@@ -451,13 +495,69 @@ onBeforeUnmount(() => {
     radial-gradient(circle at 72% 28%, rgba(155, 224, 111, 0.2), transparent 38%);
 }
 
+.about-section--sustainability {
+  min-height: 92vh;
+  align-items: end;
+  padding-block: calc(var(--nav-h) + 90px) 88px;
+}
+
+.about-section--sustainability::after {
+  background:
+    linear-gradient(90deg, rgba(10, 39, 65, 0.5) 0%, rgba(14, 57, 88, 0.3) 46%, rgba(14, 57, 88, 0.12) 100%),
+    linear-gradient(0deg, rgba(8, 31, 52, 0.24), rgba(8, 31, 52, 0.06) 48%, rgba(8, 31, 52, 0.12));
+}
+
+.about-section--sustainability .about-section__bg img {
+  object-position: center;
+}
+
+.sustainability-layout {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1180px);
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.62fr);
+  align-items: end;
+  gap: clamp(32px, 7vw, 104px);
+}
+
+.about-section--sustainability .sustainability-headline {
+  max-width: 760px;
+  color: var(--brand-paper-white);
+  font-family: var(--font-body);
+  font-size: clamp(4.5rem, 8.8vw, 8.8rem);
+  font-weight: 950;
+  line-height: 0.92;
+  text-align: left;
+  text-wrap: balance;
+}
+
+.about-section--sustainability .sustainability-headline em {
+  color: #ffdd6e;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: inherit;
+}
+
+.sustainability-copy {
+  display: grid;
+  gap: 18px;
+  padding-block-end: 8px;
+}
+
+.about-section--photo .sustainability-copy p {
+  max-width: 42ch;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.about-section--photo .sustainability-copy .about-inline-link {
+  color: #ffdd6e;
+}
+
 .about-section--photo h2,
 .about-section--photo p {
   color: var(--brand-paper-white);
-}
-
-.about-section--purpose .about-section__copy {
-  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.28);
 }
 
 .about-section--quiet {
@@ -466,35 +566,203 @@ onBeforeUnmount(() => {
     linear-gradient(135deg, #fbfaf7 0%, #edf5ef 100%);
 }
 
-.about-section--split {
-  grid-template-columns: minmax(0, 0.85fr) minmax(360px, 1fr);
-  gap: clamp(38px, 6vw, 92px);
+.about-section--approach {
+  display: block;
   background:
-    radial-gradient(circle at 84% 42%, rgba(239, 166, 43, 0.14), transparent 32%),
+    radial-gradient(circle at 14% 16%, rgba(155, 224, 111, 0.14), transparent 38%),
+    radial-gradient(circle at 88% 78%, rgba(239, 166, 43, 0.12), transparent 42%),
     #fbfaf7;
 }
 
-.about-section--split h2 {
-  text-align: left;
+.about-approach__head {
+  max-width: 880px;
+  margin: 0 auto clamp(56px, 8vw, 104px);
+  display: grid;
+  gap: 22px;
+  justify-items: center;
+  text-align: center;
 }
 
-.about-section__image {
-  height: min(68vh, 620px);
-  min-height: 420px;
-  border-radius: 48px;
-  overflow: hidden;
-  box-shadow: var(--brand-shadow-panel);
+.about-approach__lede {
+  max-width: 56ch;
+  margin-inline: auto;
+  color: var(--brand-ink-muted);
+  font-size: clamp(1.18rem, 1.5vw, 1.42rem);
+  font-weight: 600;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+.about-approach__list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  width: min(100%, 1100px);
+  display: grid;
+  gap: clamp(48px, 7vw, 96px);
+}
+
+.approach-item {
+  --accent: #2f6e69;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(24px, 4vw, 64px);
+}
+
+.approach-item:nth-child(even) {
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  text-align: right;
+}
+
+.approach-item:nth-child(even) .approach-item__num { order: 2; text-align: right; }
+.approach-item:nth-child(even) .approach-item__body { order: 1; justify-self: end; }
+
+.approach-item--01 { --accent: #2f6e69; }
+.approach-item--02 { --accent: #2d6688; }
+.approach-item--03 { --accent: #c4791b; }
+
+.approach-item__num {
+  display: block;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: clamp(5rem, 9vw, 9.4rem);
+  font-weight: 500;
+  line-height: 0.86;
+  letter-spacing: -0.04em;
+  opacity: 0.94;
+}
+
+.approach-item__body {
+  display: grid;
+  gap: 14px;
+  max-width: 56ch;
+}
+
+.approach-item__body h3 {
+  color: var(--brand-ink);
+  font-family: var(--font-body);
+  font-size: clamp(1.7rem, 2.6vw, 2.5rem);
+  font-weight: 900;
+  line-height: 1.14;
+  text-wrap: balance;
+}
+
+.approach-item__body h3 em {
+  color: var(--accent);
+  font-family: "Caveat", "Kalam", "Segoe Print", "Bradley Hand", cursive;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 1.05em;
+}
+
+.approach-item__body p {
+  max-width: 52ch;
+  color: var(--brand-ink-muted);
+  font-size: clamp(1.05rem, 1.2vw, 1.22rem);
+  font-weight: 600;
+  line-height: 1.58;
+}
+
+.about-approach__footnote {
+  margin: clamp(56px, 8vw, 104px) auto 0;
+  padding: 12px 22px;
+  width: fit-content;
+  border-radius: var(--r-pill);
+  background: rgba(35, 45, 39, 0.06);
+  color: var(--brand-ink-soft);
+  font-size: clamp(0.95rem, 1.05vw, 1.05rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
 }
 
 .about-section--values {
+  background: #bdd6e2;
+}
+
+.about-section--values::before,
+.about-section--values::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.about-section--values::before {
+  z-index: 1;
   background:
-    radial-gradient(circle at 82% 22%, rgba(155, 224, 111, 0.22), transparent 30%),
-    linear-gradient(180deg, #fbfaf7 0%, #f7f0e4 100%);
+    linear-gradient(90deg, rgba(190, 220, 227, 0.34) 0%, rgba(206, 225, 231, 0.84) 31%, rgba(213, 226, 233, 0.9) 50%, rgba(177, 197, 224, 0.84) 69%, rgba(148, 171, 210, 0.34) 100%),
+    radial-gradient(ellipse at 50% 42%, rgba(242, 246, 244, 0.76) 0 18%, rgba(216, 228, 233, 0.42) 40%, transparent 68%);
+}
+
+.about-section--values::after {
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(251, 250, 247, 0.08) 0%, transparent 20%, rgba(70, 95, 129, 0.08) 100%),
+    radial-gradient(ellipse at 50% 50%, rgba(239, 244, 243, 0.76) 0 14%, rgba(223, 232, 235, 0.38) 36%, transparent 62%);
+}
+
+.about-values__image {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  width: min(49vw, 780px);
+  opacity: 0.9;
+  overflow: hidden;
+}
+
+.about-values__image--left {
+  left: 0;
+  mask-image: linear-gradient(90deg, #000 0 66%, rgba(0, 0, 0, 0.72) 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0 66%, rgba(0, 0, 0, 0.72) 82%, transparent 100%);
+}
+
+.about-values__image--right {
+  right: -16vw;
+  mask-image: linear-gradient(270deg, #000 0 66%, rgba(0, 0, 0, 0.72) 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(270deg, #000 0 66%, rgba(0, 0, 0, 0.72) 82%, transparent 100%);
+}
+
+.about-values__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.92) contrast(0.96);
+}
+
+.about-values__image--left img {
+  object-position: 86% center;
+}
+
+.about-values__image--right img {
+  object-position: 0% center;
+  transform: translateY(4vh) scale(1.06);
+  transform-origin: right center;
+}
+
+.about-section--values .about-section__copy {
+  z-index: 3;
+}
+
+.about-values__principles {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
 }
 
 .about-section--values strong {
-  color: var(--brand-ink-soft);
+  display: block;
+  color: #2d6688;
+  font-size: clamp(1.42rem, 1.9vw, 2rem);
   font-weight: 950;
+  line-height: 1.18;
+}
+
+.about-values__principles span {
+  display: block;
 }
 
 .about-kicker {
@@ -514,11 +782,13 @@ onBeforeUnmount(() => {
   color: var(--brand-lime);
   font-size: 1.05rem;
   font-weight: 950;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 2px;
 }
 
 .about-inline-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 5px;
+  text-decoration-thickness: 3px;
 }
 
 .about-section--inclusion {
@@ -606,13 +876,27 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: translateY(24px);
   transition:
-    opacity var(--d-long) var(--ease-out-expo) var(--rise-delay, 0ms),
-    transform var(--d-long) var(--ease-out-expo) var(--rise-delay, 0ms);
+    opacity 820ms var(--ease-out-expo) var(--rise-delay, 0ms),
+    transform 820ms var(--ease-out-expo) var(--rise-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+[data-rise="fade-left"] {
+  transform: translateX(34px);
+}
+
+[data-rise="fade-right"] {
+  transform: translateX(-34px);
+}
+
+[data-rise="fade-scale"] {
+  transform: translateY(16px) scale(0.97);
 }
 
 [data-rise].is-in {
   opacity: 1;
   transform: none;
+  will-change: auto;
 }
 
 @media (max-width: 1100px) {
@@ -654,11 +938,28 @@ onBeforeUnmount(() => {
     font-size: clamp(3.8rem, 15vw, 7.2rem);
   }
 
-  .about-section,
-  .about-section--split {
+  .about-section {
     min-height: auto;
     grid-template-columns: 1fr;
     padding-block: calc(var(--nav-h) + 56px) 64px;
+  }
+
+  .approach-item,
+  .approach-item:nth-child(even) {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    text-align: left;
+  }
+
+  .approach-item:nth-child(even) .approach-item__num,
+  .approach-item:nth-child(even) .approach-item__body {
+    order: unset;
+    text-align: left;
+    justify-self: stretch;
+  }
+
+  .approach-item__num {
+    line-height: 0.92;
   }
 
   .purpose-showcase {
@@ -674,20 +975,38 @@ onBeforeUnmount(() => {
     font-size: clamp(3rem, 11vw, 5.6rem);
   }
 
-  .about-section__image {
-    min-height: 320px;
-    height: 48vh;
+  .about-values__image {
+    width: 56vw;
+    opacity: 0.48;
   }
 
-  .about-section--split h2,
   .about-section__head h2 {
     text-align: center;
   }
 
-  .about-section--split .about-section__copy,
   .about-section__head {
     margin-inline: auto;
     text-align: center;
+  }
+
+  .about-section--sustainability {
+    min-height: auto;
+    padding-block: calc(var(--nav-h) + 72px) 72px;
+  }
+
+  .sustainability-layout {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 28px;
+  }
+
+  .about-section--sustainability .sustainability-headline {
+    max-width: 680px;
+    font-size: clamp(3.7rem, 13vw, 6.4rem);
+  }
+
+  .sustainability-copy {
+    max-width: 620px;
   }
 }
 
@@ -708,8 +1027,39 @@ onBeforeUnmount(() => {
     font-size: clamp(2.8rem, 15vw, 4.7rem);
   }
 
+  .about-section--sustainability .sustainability-headline {
+    font-size: clamp(3.35rem, 16vw, 4.9rem);
+  }
+
+  .about-section--photo .sustainability-copy p {
+    font-size: 1.06rem;
+  }
+
   .purpose-showcase h2 {
     font-size: clamp(2.75rem, 13vw, 4.35rem);
+  }
+
+  .about-section--values::before {
+    background:
+      linear-gradient(180deg, rgba(210, 228, 233, 0.94) 0%, rgba(229, 237, 238, 0.98) 46%, rgba(174, 196, 223, 0.94) 100%),
+      radial-gradient(ellipse at 50% 44%, rgba(248, 249, 246, 0.9) 0 18%, rgba(221, 233, 236, 0.62) 45%, transparent 70%);
+  }
+
+  .about-values__image {
+    width: 72vw;
+    opacity: 0.36;
+  }
+
+  .about-values__image--left {
+    top: 0;
+    bottom: auto;
+    height: 52%;
+  }
+
+  .about-values__image--right {
+    top: auto;
+    bottom: 0;
+    height: 52%;
   }
 
   .explore-grid {

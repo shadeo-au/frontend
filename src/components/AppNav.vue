@@ -253,17 +253,19 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
 }
 
 .brand {
-  width: 130px;
-  min-height: 48px;
+  width: 176px;
+  min-height: 54px;
   display: inline-flex;
   align-items: center;
+  overflow: hidden;
 }
 
 .brand img {
   width: 100%;
-  height: auto;
-  max-height: 48px;
-  object-fit: contain;
+  height: 58px;
+  display: block;
+  object-fit: cover;
+  object-position: center;
 }
 
 .nav__links {
@@ -308,19 +310,19 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
 }
 
 .nav__chevron {
-  width: 17px;
-  height: 17px;
+  width: 0.65em;
+  height: 0.65em;
   flex: 0 0 auto;
-  border-right: 4px solid currentColor;
-  border-bottom: 4px solid currentColor;
-  border-radius: 2px;
-  transform: translateY(-3px) rotate(45deg);
+  border-right: 0.16em solid currentColor;
+  border-bottom: 0.16em solid currentColor;
+  border-radius: 0.08em;
+  transform: translateY(-0.12em) rotate(45deg);
   transition: transform var(--d-fast) ease;
 }
 
 .nav__link.is-open .nav__chevron,
 .nav__sheet-link[aria-expanded="true"] .nav__chevron {
-  transform: translateY(3px) rotate(225deg);
+  transform: translateY(0.12em) rotate(225deg);
 }
 
 .nav__dropdown {
@@ -501,7 +503,7 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
   }
 
   .brand {
-    width: 116px;
+    width: 148px;
   }
 
   .nav__sheet {

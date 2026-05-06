@@ -2,51 +2,83 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 const sections = [
-  { id: 'purpose', label: 'Purpose' },
   { id: 'mission', label: 'Mission' },
   { id: 'approach', label: 'Approach' },
   { id: 'values', label: 'Values' },
-  { id: 'story', label: 'Our Story' },
+  { id: 'sustainability', label: 'Sustainability' },
   { id: 'inclusion', label: 'Inclusion' },
   { id: 'explore', label: 'Explore' },
 ];
 
 const activeId = ref(sections[0].id);
-let observer: IntersectionObserver | undefined;
+const subnav = ref<HTMLElement | null>(null);
+let frame = 0;
 
-onMounted(() => {
-  observer = new IntersectionObserver(
-    (entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+const getNavOffset = () => {
+  const navHeight = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue('--nav-h')
+  ) || 76;
+  const subnavHeight = subnav.value?.offsetHeight ?? 56;
 
-      if (visible?.target.id) activeId.value = visible.target.id;
-    },
-    {
-      rootMargin: '-34% 0px -52% 0px',
-      threshold: [0.12, 0.24, 0.36, 0.48],
-    }
-  );
+  return navHeight + subnavHeight + 12;
+};
+
+const updateActiveSection = () => {
+  frame = 0;
+  const marker = getNavOffset();
+  let current = sections[0].id;
 
   sections.forEach(({ id }) => {
     const el = document.getElementById(id);
-    if (el) observer?.observe(el);
+    if (el && el.getBoundingClientRect().top <= marker) {
+      current = id;
+    }
   });
+
+  activeId.value = current;
+};
+
+const queueActiveUpdate = () => {
+  if (frame) return;
+  frame = window.requestAnimationFrame(updateActiveSection);
+};
+
+const scrollToSection = (id: string) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  activeId.value = id;
+  const top = window.scrollY + el.getBoundingClientRect().top - getNavOffset();
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  window.history.pushState(null, '', `#${id}`);
+  window.scrollTo({
+    top,
+    behavior: prefersReducedMotion ? 'auto' : 'smooth',
+  });
+};
+
+onMounted(() => {
+  window.addEventListener('scroll', queueActiveUpdate, { passive: true });
+  window.addEventListener('resize', queueActiveUpdate);
+  updateActiveSection();
 });
 
 onBeforeUnmount(() => {
-  observer?.disconnect();
+  window.removeEventListener('scroll', queueActiveUpdate);
+  window.removeEventListener('resize', queueActiveUpdate);
+  if (frame) window.cancelAnimationFrame(frame);
 });
 </script>
 
 <template>
-  <nav class="about-subnav" aria-label="About page sections">
+  <nav ref="subnav" class="about-subnav" aria-label="About page sections">
     <a
       v-for="section in sections"
       :key="section.id"
       :href="`#${section.id}`"
       :class="['about-subnav__link', { 'is-active': activeId === section.id }]"
+      @click.prevent="scrollToSection(section.id)"
     >
       {{ section.label }}
     </a>
