@@ -9,8 +9,8 @@
         v-for="item in plannerSteps"
         :key="item.id"
         type="button"
-        :disabled="!canNavigateToStep(item.id)"
-        :class="{ active: currentStep === item.id, done: item.id < currentStep && canNavigateToStep(item.id), locked: !canNavigateToStep(item.id) }"
+        :disabled="!canNavigateToStep(item.id) && currentStep !== item.id"
+        :class="{ active: currentStep === item.id, done: item.id < currentStep && canNavigateToStep(item.id), locked: !canNavigateToStep(item.id) && currentStep !== item.id }"
         @click="jumpToStep(item.id)"
       >
         <span>{{ item.id }}</span>
@@ -22,18 +22,14 @@
       <section class="planner-flow-hero">
         <p class="planner-flow-kicker">Walk Planner</p>
         <h1>Plan a cooler, easier walk.</h1>
-        <p>
-          Choose where you are starting, pick a daily destination, and compare nearby
-          walking options before opening the full route map.
-        </p>
+      
       </section>
 
-      <article v-if="currentStep === 1" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="startSectionEl">
+      <article v-if="visibleStep === 1" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="startSectionEl">
         <div class="planner-card-heading">
           <span>1</span>
           <div>
             <h2>Starting point</h2>
-            <p>Choose how Shadeo should set where your walk begins.</p>
           </div>
         </div>
 
@@ -44,7 +40,7 @@
             </span>
             <span>
               <strong>{{ isLocating ? 'Detecting your current location...' : 'Use my current location' }}</strong>
-              <small>Best when you are already at the starting point.</small>
+
             </span>
           </button>
 
@@ -54,7 +50,7 @@
             </span>
             <span>
               <strong>Search address or place</strong>
-              <small>Type a street address, suburb, or landmark as your starting point.</small>
+              <small>Type a street address or landmark as your starting point.</small>
             </span>
           </button>
         </div>
@@ -103,12 +99,7 @@
         </p>
       </article>
 
-      <article v-if="currentStep === 2" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="destinationSectionEl">
-        <button class="planner-step-back-btn" type="button" @click="jumpToStep(1)">
-          <span aria-hidden="true">&lt;</span>
-          Back
-        </button>
-
+      <article v-if="visibleStep === 2" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="destinationSectionEl">
         <div class="planner-card-heading">
           <span>2</span>
           <div>
@@ -127,7 +118,7 @@
         </div>
 
         <div v-if="destinationMode === 'category'" class="planner-category-panel">
-          <p class="planner-panel-instruction">Select one destination type. Shadeo will request nearby route options from the backend.</p>
+          <p class="planner-panel-instruction">Select one destination type. Shadeo will look for nearby walking options.</p>
           <div class="planner-type-grid planner-type-grid-clean">
             <button
               v-for="item in destinationTypes"
@@ -188,7 +179,20 @@
           {{ destinationValidationMessage }}
         </p>
 
+        <label class="planner-shade-toggle">
+          <input type="checkbox" v-model="preferShade" />
+          <Icon icon="material-symbols:park" class="planner-shade-toggle-icon" aria-hidden="true" />
+          <span class="planner-shade-toggle-text">
+            <strong>Prefer shaded route</strong>
+            <small>Walk under tree cover where possible (slightly longer)</small>
+          </span>
+        </label>
+
         <div class="planner-flow-action">
+          <button class="btn planner-change-btn planner-return-btn" type="button" @click="jumpToStep(1)">
+            <span aria-hidden="true">&lt;</span>
+            Back
+          </button>
           <button class="btn btn-primary planner-continue-btn" type="button" :disabled="!canFindRecommendations || isLoadingPlan" @click="requestPlan">
             {{ isLoadingPlan ? 'Requesting route...' : 'Next' }}
             <span aria-hidden="true">&gt;</span>
@@ -198,19 +202,14 @@
       </article>
 
       <section class="planner-result-anchor" ref="resultsSectionEl">
-        <article v-if="currentStep === 3 && isLoadingPlan" class="planner-card planner-result-loading-card planner-step-pop">
+        <article v-if="visibleStep === 3 && isLoadingPlan" class="planner-card planner-result-loading-card planner-step-pop">
           <span class="planner-spinner" aria-hidden="true"></span>
           <h3>Requesting your route...</h3>
-          <p>Shadeo is checking the backend planner for the nearest suitable result.</p>
+          <p>Shadeo is checking nearby walking options for you.</p>
         </article>
 
-        <article v-else-if="currentStep === 3 && hasSearched && recommendations.length && !hasDestination" class="planner-card planner-recommendation-layout planner-step-pop">
+        <article v-else-if="visibleStep === 3 && hasSearched && recommendations.length" class="planner-card planner-recommendation-layout planner-step-pop">
           <div class="planner-recommendation-list">
-            <button class="planner-step-back-btn" type="button" @click="jumpToStep(2)">
-              <span aria-hidden="true">&lt;</span>
-              Back
-            </button>
-
             <div class="planner-section-headline">
               <p>Results</p>
               <h3>Compare nearby options</h3>
@@ -244,130 +243,143 @@
                     {{ formatDistance(item.metrics.distanceMeters) }}
                   </span>
                 </span>
-                <span class="planner-tag-row">
-                  <em v-for="note in item.comfortNotes.slice(0, index === 0 ? 3 : 2)" :key="note">{{ note }}</em>
+                <span v-if="recommendationSummaryNotes(item).length" class="planner-tag-row">
+                  <em v-for="note in recommendationSummaryNotes(item)" :key="note">{{ note }}</em>
                 </span>
                 <button
                   v-if="highlightedRecommendationId === item.id"
                   class="planner-view-details"
                   type="button"
-                  @click.stop="selectRecommendation(item)"
+                  @click.stop="openRecommendationDetails(item)"
                 >
-                  Next <span aria-hidden="true">&gt;</span>
+                  View detail
                 </button>
               </span>
             </article>
+            <div class="planner-result-actions">
+              <button class="btn planner-change-btn planner-return-btn" type="button" @click="jumpToStep(2)">
+                <span aria-hidden="true">&lt;</span>
+                Back
+              </button>
+              <button class="btn btn-primary planner-see-route-btn" type="button" :disabled="!selectedRecommendation || !canSeeRoute" @click="openRouteReadinessPrompt">
+                See route <span aria-hidden="true">&gt;</span>
+              </button>
+            </div>
           </div>
           <div class="planner-mini-map-panel">
             <div class="planner-mini-map-head">
               <strong>Nearby options</strong>
-              <span>Backend destination pin and your selected start point</span>
+              <span>Your selected start point and the nearby options.</span>
             </div>
             <div ref="miniMapEl" class="planner-mini-map"></div>
           </div>
         </article>
 
-        <article v-else-if="currentStep === 3 && hasSearched && !isLoadingPlan && !recommendations.length" class="planner-card planner-result-loading-card planner-step-pop">
+        <article v-else-if="visibleStep === 3 && hasSearched && !isLoadingPlan && !recommendations.length" class="planner-card planner-result-loading-card planner-step-pop">
           <button class="planner-step-back-btn" type="button" @click="jumpToStep(2)">
             <span aria-hidden="true">&lt;</span>
             Back
           </button>
-          <h3>No route result found</h3>
-          <p>{{ planError || 'The backend did not return a suitable destination for this start point and category.' }}</p>
-        </article>
-
-        <article v-else-if="currentStep === 3 && hasDestination" class="planner-card planner-recommendation-layout planner-detail-layout planner-step-pop">
-          <div class="planner-detail-panel">
-            <button class="planner-back-btn" type="button" @click="backToRecommendations">Back</button>
-            <div class="planner-detail-title-row">
-              <img :src="selectedTypeIconUrl" alt="" />
-              <div>
-                <p>{{ result.destination.address }}</p>
-                <h3>{{ result.destination.name }}</h3>
-              </div>
-            </div>
-
-            <div class="planner-metric-row">
-              <span class="planner-metric-chip">
-                <img :src="walkIcon" alt="" aria-hidden="true" />
-                <strong>{{ distanceMetric.value }}</strong>
-                <em>{{ distanceMetric.unit }}</em>
-                <small>away</small>
-              </span>
-              <span class="planner-metric-chip">
-                <img :src="timeIcon" alt="" aria-hidden="true" />
-                <strong>{{ walkMetric.value }}</strong>
-                <em>{{ walkMetric.unit }}</em>
-                <small>walk</small>
-              </span>
-            </div>
-
-            <div class="planner-detail-facilities">
-              <h3>Along the way</h3>
-              <div class="rv-fac-grid">
-                <div class="rv-fac-card rv-fac-bench" v-if="facilityBreakdown.bench > 0">
-                  <img :src="benchIcon" alt="" />
-                  <div>
-                    <strong>{{ facilityBreakdown.bench }}</strong>
-                    <span>Benches</span>
-                  </div>
-                </div>
-                <div class="rv-fac-card rv-fac-toilet" v-if="facilityBreakdown.toilet > 0">
-                  <img :src="toiletIcon" alt="" />
-                  <div>
-                    <strong>{{ facilityBreakdown.toilet }}</strong>
-                    <span>Toilets</span>
-                  </div>
-                </div>
-                <div class="rv-fac-card rv-fac-fountain" v-if="facilityBreakdown.drinking_fountain > 0">
-                  <img :src="fountainIcon" alt="" />
-                  <div>
-                    <strong>{{ facilityBreakdown.drinking_fountain }}</strong>
-                    <span>Fountains</span>
-                  </div>
-                </div>
-                <div
-                  v-if="facilityBreakdown.bench === 0 && facilityBreakdown.toilet === 0 && facilityBreakdown.drinking_fountain === 0"
-                  class="rv-no-facilities"
-                >
-                  No support facilities were returned along this route
-                </div>
-              </div>
-            </div>
-
-            <div class="planner-summary-actions">
-              <button class="btn btn-primary planner-see-route-btn" @click="openReadinessCheck" :disabled="!canSeeRoute">
-                Next
-              </button>
-              <button class="btn planner-change-btn planner-return-btn" @click="backToRecommendations">
-                Back
-              </button>
-            </div>
-          </div>
-          <div class="planner-mini-map-panel">
-            <div class="planner-mini-map-head">
-              <strong>Route preview</strong>
-              <span>Start and destination locations only</span>
-            </div>
-            <div ref="miniMapEl" class="planner-mini-map"></div>
-          </div>
+          <h3>No walking option found</h3>
+          <p>{{ planError || 'We could not find a suitable walking option for this start point and destination.' }}</p>
         </article>
       </section>
     </section>
 
+    <div v-if="isDetailOpen && detailRecommendation" class="planner-detail-backdrop" role="presentation" @click.self="closeRecommendationDetails">
+      <section class="planner-detail-modal planner-card" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <button class="planner-modal-close" type="button" aria-label="Close details" @click="closeRecommendationDetails">X</button>
+        <div class="planner-detail-title-row">
+          <img :src="recommendationTypeIconUrl(detailRecommendation)" alt="" />
+          <div>
+            <h3 id="detail-title">{{ detailRecommendation.destination.name }}</h3>
+          </div>
+        </div>
+        <div class="planner-detail-grid">
+          <span class="planner-metric-chip">
+            <img :src="walkIcon" alt="" aria-hidden="true" />
+            <strong>{{ formatDistance(detailRecommendation.metrics.distanceMeters) }}</strong>
+            <small>away</small>
+          </span>
+          <span class="planner-metric-chip">
+            <img :src="timeIcon" alt="" aria-hidden="true" />
+            <strong>{{ formatMinutes(detailRecommendation.metrics.durationMinutes) }}</strong>
+            <small>walk</small>
+          </span>
+          <span class="planner-metric-chip planner-metric-chip-shade">
+            <Icon icon="material-symbols:park" aria-hidden="true" />
+            <strong>{{ recommendationShadeLabel(detailRecommendation) }}</strong>
+            <small>tree shade</small>
+          </span>
+        </div>
+        <div class="planner-detail-info-list">
+          <div>
+            <strong>Address</strong>
+            <span>{{ detailRecommendation.destination.address || '' }}</span>
+          </div>
+          <div>
+            <strong>Opening hours</strong>
+            <span>{{ detailRecommendation.destination.openingHours || '' }}</span>
+          </div>
+          <div v-if="hasDetailFacilities">
+            <strong>Along the way</strong>
+            <span>{{ detailFacilitySummaryText }}</span>
+          </div>
+        </div>
+        <div class="rv-fac-grid planner-detail-facility-grid">
+          <div class="rv-fac-card rv-fac-bench">
+            <img :src="benchIcon" alt="" />
+            <div>
+              <strong>{{ detailFacilityBreakdown.bench }}</strong>
+              <span>Benches</span>
+            </div>
+          </div>
+          <div class="rv-fac-card rv-fac-toilet">
+            <img :src="toiletIcon" alt="" />
+            <div>
+              <strong>{{ detailFacilityBreakdown.toilet }}</strong>
+              <span>Toilets</span>
+            </div>
+          </div>
+          <div class="rv-fac-card rv-fac-fountain">
+            <img :src="fountainIcon" alt="" />
+            <div>
+              <strong>{{ detailFacilityBreakdown.drinking_fountain }}</strong>
+              <span>Fountains</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="isReadinessPromptOpen" class="planner-readiness-backdrop" role="presentation">
+      <section class="planner-readiness-modal planner-readiness-prompt" role="dialog" aria-modal="true" aria-labelledby="readiness-prompt-title">
+        <button class="planner-modal-close" type="button" aria-label="Skip checklist and open route" @click="skipReadinessAndOpenRoute">X</button>
+        <div class="planner-readiness-head">
+          <div>
+            <p>Before you go</p>
+            <h2 id="readiness-prompt-title">A quick readiness check is strongly recommended.</h2>
+          </div>
+        </div>
+        <p class="planner-readiness-advice">
+          The checklist helps you review weather, everyday items, and destination reminders before opening the full map.
+        </p>
+        <div class="planner-summary-actions planner-prompt-actions">
+          <button class="btn planner-change-btn" type="button" @click="skipReadinessAndOpenRoute">Skip</button>
+          <button class="btn btn-primary planner-ready-btn" type="button" @click="readReadinessChecklist">Read checklist</button>
+        </div>
+      </section>
+    </div>
+
     <div v-if="isReadinessOpen" class="planner-readiness-backdrop" role="presentation">
       <section class="planner-readiness-modal" role="dialog" aria-modal="true" aria-labelledby="readiness-title">
+        <button class="planner-modal-close" type="button" aria-label="Close checklist and open route" @click="confirmReadyToGo">X</button>
         <div class="planner-readiness-head">
           <div>
             <p>Pre-trip Check</p>
             <h2 id="readiness-title">Are you ready to go?</h2>
           </div>
         </div>
-
-        <button class="planner-step-back-btn" type="button" @click="closeReadinessToResults">
-          <span aria-hidden="true">&lt;</span>
-          Back
-        </button>
 
         <div class="planner-readiness-block planner-weather-card">
           <div class="planner-readiness-title-row">
@@ -426,16 +438,15 @@
         </div>
 
         <div class="planner-summary-actions">
-          <button class="btn btn-primary planner-ready-btn" type="button" @click="confirmReadyToGo">Next</button>
-          <button class="btn planner-change-btn" type="button" disabled>Download route summary (coming soon)</button>
+          <button class="btn btn-primary planner-ready-btn" type="button" @click="confirmReadyToGo">Open route</button>
         </div>
       </section>
     </div>
 
     <section v-if="isRouteView" class="planner-route-shell">
       <aside class="planner-route-panel rv-panel">
-        <button class="planner-back-btn rv-back-btn" @click="jumpToStep(4)">
-          <span class="rv-back-icon" aria-hidden="true">&lt;</span>
+        <button class="planner-step-back-btn rv-back-btn" @click="showStep(3)">
+          <span aria-hidden="true">&lt;</span>
           Back
         </button>
 
@@ -446,6 +457,7 @@
           <div class="rv-dest-info">
             <p class="rv-dest-type-label">{{ selectedTypeLabel }}</p>
             <h2 class="rv-dest-name">{{ result.destination?.name }}</h2>
+            <p v-if="result.destination?.address" class="rv-dest-address">{{ result.destination.address }}</p>
           </div>
         </div>
 
@@ -468,33 +480,27 @@
 
         <div class="rv-section">
           <h3>Along the way</h3>
-          <div class="rv-fac-grid">
-            <div class="rv-fac-card rv-fac-bench" v-if="facilityBreakdown.bench > 0">
+          <div class="rv-fac-grid rv-route-fac-grid">
+            <div class="rv-fac-card rv-fac-bench">
               <img :src="benchIcon" alt="" />
               <div>
                 <strong>{{ facilityBreakdown.bench }}</strong>
                 <span>Benches</span>
               </div>
             </div>
-            <div class="rv-fac-card rv-fac-toilet" v-if="facilityBreakdown.toilet > 0">
+            <div class="rv-fac-card rv-fac-toilet">
               <img :src="toiletIcon" alt="" />
               <div>
                 <strong>{{ facilityBreakdown.toilet }}</strong>
                 <span>Toilets</span>
               </div>
             </div>
-            <div class="rv-fac-card rv-fac-fountain" v-if="facilityBreakdown.drinking_fountain > 0">
+            <div class="rv-fac-card rv-fac-fountain">
               <img :src="fountainIcon" alt="" />
               <div>
                 <strong>{{ facilityBreakdown.drinking_fountain }}</strong>
                 <span>Fountains</span>
               </div>
-            </div>
-            <div
-              v-if="facilityBreakdown.bench === 0 && facilityBreakdown.toilet === 0 && facilityBreakdown.drinking_fountain === 0"
-              class="rv-no-facilities"
-            >
-              No support facilities were returned along this route
             </div>
           </div>
         </div>
@@ -543,10 +549,6 @@
           </div>
         </div>
 
-        <div class="rv-section">
-          <h3>Save route</h3>
-          <button class="btn planner-change-btn planner-export-btn" type="button" disabled>Download route summary (coming soon)</button>
-        </div>
       </aside>
 
       <section class="planner-route-map-area">
@@ -593,7 +595,7 @@ const MAP_MIN_ZOOM = 12
 const MAP_MAX_ZOOM = Number(import.meta.env.VITE_MAP_MAX_ZOOM || 18)
 const PMTILES_MAX_DATA_ZOOM = Number(import.meta.env.VITE_PMTILES_MAX_DATA_ZOOM || 16)
 const MUNICIPAL_BOUNDARY_URL = '/data/municipal-boundary.geojson'
-const SUPPORTED_AREA_ERROR = 'This location is outside the supported Central Melbourne area.'
+const SUPPORTED_AREA_ERROR = 'This location is outside our current Central Melbourne coverage area.'
 const MAP_STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || '/styles/positron/style.json'
 const PMTILES_URL = import.meta.env.VITE_PMTILES_URL || 'https://pub-64269a193cf745e5b366a287e94c5196.r2.dev/maps/melbourne-v2.pmtiles'
 const MAP_GLYPHS_URL = import.meta.env.VITE_MAP_GLYPHS_URL || '/fonts/{fontstack}/{range}.pbf'
@@ -610,8 +612,7 @@ const plannerSteps = [
   { id: 1, label: 'Start' },
   { id: 2, label: 'Destination' },
   { id: 3, label: 'Results' },
-  { id: 4, label: 'Readiness' },
-  { id: 5, label: 'Route' }
+  { id: 4, label: 'Route' }
 ]
 
 const destinationTypes = [
@@ -706,7 +707,13 @@ const highlightedRecommendationId = ref('')
 const isSearchingStart = ref(false)
 const isSearchingDestination = ref(false)
 const isLoadingPlan = ref(false)
+// Whether the user wants to prefer shaded streets when planning the route.
+// Sent to the backend as preferShade=true; backend returns shadeCoverage on
+// the routeSummary so we can display "Your route is N% shaded".
+const preferShade = ref(false)
 const isLocating = ref(false)
+const isDetailOpen = ref(false)
+const isReadinessPromptOpen = ref(false)
 const isReadinessOpen = ref(false)
 const isRouteView = ref(false)
 const hasSearched = ref(false)
@@ -749,6 +756,8 @@ const miniMapMarkers = []
 const routeMapMarkers = []
 
 const hasDestination = computed(() => !!result.destination)
+const selectedRecommendation = computed(() => recommendations.value.find((item) => item.id === highlightedRecommendationId.value) || null)
+const detailRecommendation = computed(() => selectedRecommendation.value)
 const destinationKind = computed(() => selectedType.value || result.destination?.type || selectedSpecificDestination.value?.type || '')
 const selectedTypeLabel = computed(() => destinationTypes.find((d) => d.id === selectedType.value)?.label || selectedSpecificDestination.value?.type || 'Destination')
 const selectedTypeIconUrl = computed(() => destinationTypes.find((d) => d.id === selectedType.value || d.id === selectedSpecificDestination.value?.type)?.icon || parkIcon)
@@ -758,10 +767,15 @@ const destinationReadyLabel = computed(() => {
 })
 const canFindRecommendations = computed(() => !!selectedStart.value && (destinationMode.value === 'specific' ? !!selectedSpecificDestination.value : !!selectedType.value))
 const currentStep = computed(() => {
-  if (isRouteView.value) return 5
-  if (isReadinessOpen.value) return 4
+  if (isRouteView.value || isReadinessOpen.value || isReadinessPromptOpen.value) return 4
   return visibleStep.value
 })
+const shadeMetric = computed(() => {
+  const v = result.metrics?.shadeCoverage
+  if (!Number.isFinite(v)) return null
+  return { value: Math.round(v * 100) }
+})
+
 const routeDistanceMeters = computed(() => Number.isFinite(result.metrics.distanceMeters) ? result.metrics.distanceMeters : 0)
 const distanceMetric = computed(() => routeDistanceMeters.value >= 1000
   ? { value: (routeDistanceMeters.value / 1000).toFixed(2), unit: 'km' }
@@ -769,6 +783,7 @@ const distanceMetric = computed(() => routeDistanceMeters.value >= 1000
 const walkMinutes = computed(() => Number.isFinite(result.metrics.durationMinutes) ? `${Math.max(1, Math.round(result.metrics.durationMinutes))}` : '--')
 const walkMetric = computed(() => ({ value: walkMinutes.value, unit: 'min' }))
 const facilityBreakdown = computed(() => {
+  if (!hasDestination.value && selectedRecommendation.value) return facilityBreakdownForRecommendation(selectedRecommendation.value)
   const output = { bench: 0, drinking_fountain: 0, toilet: 0 }
   Object.entries(result.facilitySummary || {}).forEach(([key, value]) => {
     if (output[key] !== undefined && Number.isFinite(Number(value))) output[key] = Number(value)
@@ -779,6 +794,13 @@ const facilityBreakdown = computed(() => {
   })
   return output
 })
+const detailFacilityBreakdown = computed(() => detailRecommendation.value ? facilityBreakdownForRecommendation(detailRecommendation.value) : { bench: 0, drinking_fountain: 0, toilet: 0 })
+const detailFacilitySummaryText = computed(() => {
+  const names = facilityTypeNames(detailFacilityBreakdown.value)
+  return names.length ? `You may pass ${names.join(', ')}.` : ''
+})
+const hasDetailFacilities = computed(() => Object.values(detailFacilityBreakdown.value).some((value) => value > 0))
+const hasAnyFacility = computed(() => Object.values(facilityBreakdown.value).some((value) => value > 0))
 const routeComfortNotes = computed(() => result.comfortNotes.length ? result.comfortNotes : readinessRouteAlerts.value)
 const scoreBreakdownRows = computed(() => [
   { key: 'distance', label: 'Distance and time', value: result.scoreBreakdown.distance ?? '--' },
@@ -849,7 +871,7 @@ const weatherAdvice = computed(() => {
   }
 })
 const readinessRouteAlerts = computed(() => [
-  'This route can include backend comfort markers for benches, toilets, and drinking fountains.',
+  'This route may include comfort markers for benches, toilets, and drinking fountains.',
   'Tree canopy shade is displayed on the final route map when available.'
 ])
 const readinessResult = computed(() => {
@@ -860,7 +882,11 @@ const routeInstructions = computed(() => result.instructions.length ? result.ins
   { text: `Follow the highlighted route to ${result.destination?.name || 'your destination'}.`, distanceMeters: result.metrics.distanceMeters },
   { text: 'Check the route notes before leaving.', distanceMeters: null }
 ])
-const canSeeRoute = computed(() => !!result.destination && result.route.length > 1)
+const canSeeRoute = computed(() => {
+  const option = selectedRecommendation.value
+  if (option) return option.route.length > 1
+  return !!result.destination && result.route.length > 1
+})
 const showMapShoppingList = computed(() => destinationKind.value === 'grocery' && shoppingItems.value.length > 0)
 
 const formatScore = (score) => Number.isFinite(Number(score)) ? `${Math.round(Number(score))}/100` : 'Score --'
@@ -876,7 +902,45 @@ const formatDistance = (meters) => {
   if (!Number.isFinite(value)) return '-- m'
   return value >= 1000 ? `${(value / 1000).toFixed(2)} km` : `${Math.round(value)} m`
 }
-const firstComfortNote = (recommendation) => recommendation.comfortNotes?.[0] || 'Comfort score based on distance and route support'
+const friendlyErrorMessage = (fallback = 'Something went wrong. Please try again in a moment.') => fallback
+const friendlyServiceErrorMessage = () => 'The service is busy right now. Please try again in a moment.'
+const friendlySearchErrorMessage = () => 'Search is taking longer than expected. Please try again in a moment.'
+const facilityBreakdownForRecommendation = (recommendation) => {
+  const output = { bench: 0, drinking_fountain: 0, toilet: 0 }
+  Object.entries(recommendation?.facilitySummary || {}).forEach(([key, value]) => {
+    if (output[key] !== undefined && Number.isFinite(Number(value))) output[key] = Number(value)
+  })
+  if (Object.values(output).some((value) => value > 0)) return output
+  ;(recommendation?.facilities || []).forEach((item) => {
+    if (output[item.type] !== undefined) output[item.type] += 1
+  })
+  return output
+}
+const facilityTypeNames = (breakdown) => {
+  const names = []
+  if ((breakdown?.bench || 0) > 0) names.push('benches')
+  if ((breakdown?.toilet || 0) > 0) names.push('toilets')
+  if ((breakdown?.drinking_fountain || 0) > 0) names.push('drinking fountains')
+  return names
+}
+const recommendationSummaryNotes = (recommendation) => {
+  const notes = []
+  const breakdown = facilityBreakdownForRecommendation(recommendation)
+  const names = facilityTypeNames(breakdown)
+  if (names.length) notes.push(`Along the way: ${names.join(', ')}`)
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  if (Number.isFinite(shade)) notes.push(`${Math.round(shade * 100)}% tree shade`)
+  return notes
+}
+const recommendationShadeLabel = (recommendation) => {
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  return Number.isFinite(shade) ? `${Math.round(shade * 100)}%` : 'Not available yet'
+}
+const recommendationTypeIconUrl = (recommendation) => {
+  const type = recommendation?.destination?.type || selectedType.value || selectedSpecificDestination.value?.type
+  return destinationTypes.find((item) => item.id === type)?.icon || selectedTypeIconUrl.value
+}
+const firstComfortNote = (recommendation) => recommendation.comfortNotes?.[0] || 'Comfort score based on walking time, shade, and nearby facilities'
 const scrollTo = (el) => el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 const unlockStep = (id) => {
   maxReachableStep.value = Math.max(maxReachableStep.value, id)
@@ -884,7 +948,7 @@ const unlockStep = (id) => {
 const lockAfterStep = (id) => {
   maxReachableStep.value = Math.min(maxReachableStep.value, id)
 }
-const canNavigateToStep = (id) => id <= maxReachableStep.value
+const canNavigateToStep = (id) => id <= Math.min(maxReachableStep.value, 3)
 const showStep = async (id) => {
   visibleStep.value = id
   isReadinessOpen.value = false
@@ -1094,7 +1158,7 @@ const searchPlaces = async (query) => {
   const response = await fetch(placeSearchEndpoint(query))
   const payload = await readJsonResponse(response)
   if (!response.ok) {
-    throw new Error(payload.error || payload.message || `Place search failed (${response.status})`)
+    throw new Error(friendlySearchErrorMessage())
   }
   return {
     places: normalisePlaceSearchResults(payload),
@@ -1122,13 +1186,13 @@ const loadWeatherForStart = async () => {
   try {
     const response = await fetch(weatherEndpoint(place))
     const payload = await readJsonResponse(response)
-    if (!response.ok) throw new Error(payload.reason || payload.error || `Weather request failed (${response.status})`)
+    if (!response.ok) throw new Error('Weather advice is not available right now.')
     weather.current = payload.current || null
     weather.daily = payload.daily || null
   } catch (error) {
     weather.current = null
     weather.daily = null
-    weather.error = error instanceof Error ? error.message : 'Weather request failed.'
+    weather.error = 'Weather advice is not available right now.'
   } finally {
     weather.isLoading = false
   }
@@ -1152,6 +1216,7 @@ const normaliseBackendDestination = (destination, fallback = {}) => {
     name: destination?.name || fallback.name || 'Recommended destination',
     type,
     address: destination?.address || destination?.vicinity || destination?.formatted || fallback.address || selectedTypeLabel.value,
+    openingHours: destination?.openingHours || destination?.opening_hours || destination?.hours || fallback.openingHours || '',
     lat,
     lng
   }
@@ -1181,12 +1246,13 @@ const buildBackendComfortNotes = (facilities, routeSummary) => {
   const benches = facilities.filter((item) => item.type === 'bench').length
   const toilets = facilities.filter((item) => item.type === 'toilet').length
   const fountains = facilities.filter((item) => item.type === 'drinking_fountain').length
-  if (benches) notes.push(`${benches} rest stop${benches === 1 ? '' : 's'} along the route`)
-  if (toilets) notes.push(`${toilets} toilet${toilets === 1 ? '' : 's'} nearby`)
-  if (fountains) notes.push(`${fountains} drinking fountain${fountains === 1 ? '' : 's'} nearby`)
-  if (!notes.length) notes.push('No route-support facilities returned nearby')
-  const distance = Number(routeSummary?.walkingDistanceMeters)
-  if (Number.isFinite(distance)) notes.push(`${formatDistance(distance)} backend walking route`)
+  const names = []
+  if (benches) names.push('benches')
+  if (toilets) names.push('toilets')
+  if (fountains) names.push('drinking fountains')
+  if (names.length) notes.push(`Along the way: ${names.join(', ')}`)
+  const shade = Number(routeSummary?.shadeCoverage)
+  if (Number.isFinite(shade)) notes.push(`${Math.round(shade * 100)}% tree shade`)
   return notes
 }
 const buildBackendRecommendation = (payload, index = 0) => {
@@ -1205,7 +1271,9 @@ const buildBackendRecommendation = (payload, index = 0) => {
     facilitySummary: payload.facilitySummary || {},
     metrics: {
       distanceMeters: Number.isFinite(distanceMeters) ? distanceMeters : null,
-      durationMinutes: Number.isFinite(durationMinutes) ? durationMinutes : null
+      durationMinutes: Number.isFinite(durationMinutes) ? durationMinutes : null,
+      shadeCoverage: Number.isFinite(Number(routeSummary.shadeCoverage)) ? Number(routeSummary.shadeCoverage) : null,
+      preferShade: Boolean(routeSummary.preferShade)
     },
     score: Number.isFinite(Number(payload.score)) ? Number(payload.score) : null,
     scoreBreakdown: payload.scoreBreakdown || {},
@@ -1247,12 +1315,14 @@ const fetchBackendPlan = async () => {
           name: selectedSpecificDestination.value.name,
           lat: selectedSpecificDestination.value.lat,
           lng: selectedSpecificDestination.value.lng
-        }
+        },
+        preferShade: preferShade.value
       }
     : {
         mode: 'destination_type',
         start,
-        destinationType: selectedType.value
+        destinationType: selectedType.value,
+        preferShade: preferShade.value
       }
   const response = await fetch(routePlanEndpoint(), {
     method: 'POST',
@@ -1260,7 +1330,7 @@ const fetchBackendPlan = async () => {
   })
   const payload = await readJsonResponse(response)
   if (!response.ok) {
-    throw new Error(payload.error || payload.message || `Route planner request failed (${response.status})`)
+    throw new Error(friendlyServiceErrorMessage())
   }
   return payload
 }
@@ -1305,13 +1375,13 @@ const runStartSearch = async () => {
     startOutOfAreaCount.value = result.outOfAreaCount
     if (!result.places.length) {
       startValidationMessage.value = result.outOfAreaCount > 0
-        ? `No matches in Central Melbourne. Found ${result.outOfAreaCount} result${result.outOfAreaCount === 1 ? '' : 's'} outside our coverage area — try a closer place.`
+        ? 'No matches in Central Melbourne. Try a closer place or a more specific address.'
         : 'No matching places were returned. Try a more specific address or landmark.'
     }
   } catch (error) {
     startSearchResults.value = []
     startOutOfAreaCount.value = 0
-    startValidationMessage.value = error instanceof Error ? error.message : 'Place search failed.'
+    startValidationMessage.value = friendlySearchErrorMessage()
   } finally {
     isSearchingStart.value = false
   }
@@ -1345,13 +1415,13 @@ const runDestinationSearch = async () => {
     destinationOutOfAreaCount.value = result.outOfAreaCount
     if (!result.places.length) {
       destinationValidationMessage.value = result.outOfAreaCount > 0
-        ? `No matches in Central Melbourne. Found ${result.outOfAreaCount} result${result.outOfAreaCount === 1 ? '' : 's'} outside our coverage area — try a closer place.`
+        ? 'No matches in Central Melbourne. Try a closer place or a more specific place name.'
         : 'No matching destinations were returned. Try a more specific place name.'
     }
   } catch (error) {
     destinationSearchResults.value = []
     destinationOutOfAreaCount.value = 0
-    destinationValidationMessage.value = error instanceof Error ? error.message : 'Destination search failed.'
+    destinationValidationMessage.value = friendlySearchErrorMessage()
   } finally {
     isSearchingDestination.value = false
   }
@@ -1455,7 +1525,7 @@ const requestPlan = async () => {
   try {
     const payload = await fetchBackendPlan()
     if (payload?.eligible === false) {
-      planError.value = payload.message || 'This route is outside the supported walking range.'
+      planError.value = 'This route is outside our current walking range.'
       recommendations.value = []
     } else {
       const backendRecommendations = buildRecommendationsFromPayload(payload)
@@ -1464,12 +1534,13 @@ const requestPlan = async () => {
         if (await isPlaceInSupportedArea(recommendation.destination)) supportedRecommendations.push(recommendation)
       }
       if (!supportedRecommendations.length) {
-        planError.value = payload.message || 'No suitable route option was returned.'
+        planError.value = 'We could not find a suitable walking option for this start point and destination.'
       }
       recommendations.value = supportedRecommendations
+      highlightedRecommendationId.value = supportedRecommendations[0]?.id || ''
     }
   } catch (error) {
-    planError.value = error instanceof Error ? error.message : 'Route planner request failed.'
+    planError.value = friendlyServiceErrorMessage()
     recommendations.value = []
   } finally {
     isLoadingPlan.value = false
@@ -1544,6 +1615,13 @@ const selectRecommendation = async (recommendation) => {
   drawMiniMap()
   loadCanopyForRoute(recommendation?.route || [])
   scrollTo(resultsSectionEl.value)
+}
+const openRecommendationDetails = (recommendation) => {
+  highlightedRecommendationId.value = recommendation?.id || ''
+  isDetailOpen.value = true
+}
+const closeRecommendationDetails = () => {
+  isDetailOpen.value = false
 }
 const backToRecommendations = async () => {
   applySelectedRecommendation(null)
@@ -1898,6 +1976,8 @@ const clearMarkers = (markers) => {
 const addHtmlMarker = (targetMap, markers, lngLat, html, options = {}) => {
   const el = document.createElement('div')
   el.className = 'planner-maplibre-marker'
+  if (options.className) el.classList.add(options.className)
+  if (options.zIndex != null) el.style.zIndex = String(options.zIndex)
   el.innerHTML = html
   const marker = new maplibregl.Marker({
     element: el,
@@ -2140,19 +2220,30 @@ const drawMarkerSet = (targetMap, markers, lngLatBounds, includeFacilities = fal
     targetMap,
     markers,
     [start.lng, start.lat],
-    includeFacilities ? startMarkerHtml() : '<div class="rv-pin-start"></div><div class="rv-pin-label rv-pin-label-start">Start</div>'
+    includeFacilities ? startMarkerHtml() : '<div class="rv-pin-start"></div><div class="rv-pin-label rv-pin-label-start">Start</div>',
+    { zIndex: 20 }
   )
   lngLatBounds.push([start.lng, start.lat])
 
-  const destinations = hasDestination.value ? [result] : recommendations.value
-  destinations.forEach((item, index) => {
+  const destinations = (targetMap === miniMap && recommendations.value.length
+    ? recommendations.value
+    : hasDestination.value ? [result] : recommendations.value)
+    .map((item, index) => ({ item, index }))
+  const orderedDestinations = [
+    ...destinations.filter(({ item }) => !(!hasDestination.value && highlightedRecommendationId.value === item.id)),
+    ...destinations.filter(({ item }) => !hasDestination.value && highlightedRecommendationId.value === item.id)
+  ]
+  orderedDestinations.forEach(({ item, index }) => {
     const destination = item.destination
     const isHighlighted = !hasDestination.value && highlightedRecommendationId.value === item.id
     const pinClass = isHighlighted ? 'rv-pin-dest is-highlighted' : 'rv-pin-dest'
     const destHtml = hasDestination.value
       ? destinationMarkerHtml(selectedTypeLabel.value)
       : `<div class="${pinClass}">${index + 1}</div><div class="rv-pin-label rv-pin-label-dest">${destination.name}</div>`
-    addHtmlMarker(targetMap, markers, [destination.lng, destination.lat], destHtml)
+    addHtmlMarker(targetMap, markers, [destination.lng, destination.lat], destHtml, {
+      className: isHighlighted ? 'planner-marker-highlighted' : '',
+      zIndex: isHighlighted ? 80 : hasDestination.value ? 50 : 30 + index
+    })
     lngLatBounds.push([destination.lng, destination.lat])
   })
 
@@ -2179,7 +2270,16 @@ const drawMiniMap = async () => {
   if (!miniMap?.isStyleLoaded()) return
   const lngLatBounds = []
   drawMarkerSet(miniMap, miniMapMarkers, lngLatBounds, false)
-  fitMapToPoints(miniMap, lngLatBounds, 34)
+  const focusedDestination = selectedRecommendation.value?.destination
+  if (focusedDestination && Number.isFinite(Number(focusedDestination.lng)) && Number.isFinite(Number(focusedDestination.lat))) {
+    miniMap.easeTo({
+      center: [focusedDestination.lng, focusedDestination.lat],
+      zoom: Math.min(MAP_MAX_ZOOM, 15.4),
+      duration: 260
+    })
+  } else {
+    fitMapToPoints(miniMap, lngLatBounds, 34)
+  }
   requestAnimationFrame(() => miniMap?.resize())
 }
 const destroyMiniMap = () => {
@@ -2241,8 +2341,29 @@ const openReadinessCheck = () => {
   if (!hasDestination.value) return
   unlockStep(4)
   destroyMiniMap()
+  isReadinessPromptOpen.value = false
   isReadinessOpen.value = true
   loadWeatherForStart()
+}
+const openRouteReadinessPrompt = () => {
+  const recommendation = selectedRecommendation.value
+  if (!recommendation) return
+  applySelectedRecommendation(recommendation)
+  loadCanopyForRoute(recommendation.route || [])
+  unlockStep(4)
+  isDetailOpen.value = false
+  isReadinessPromptOpen.value = true
+}
+const readReadinessChecklist = () => {
+  if (!hasDestination.value) return
+  isReadinessPromptOpen.value = false
+  isReadinessOpen.value = true
+  destroyMiniMap()
+  loadWeatherForStart()
+}
+const skipReadinessAndOpenRoute = async () => {
+  isReadinessPromptOpen.value = false
+  await confirmReadyToGo()
 }
 const closeReadinessToResults = async () => {
   isReadinessOpen.value = false
@@ -2258,8 +2379,9 @@ const closeReadinessToResults = async () => {
 }
 const confirmReadyToGo = async () => {
   if (!hasDestination.value) return
+  isReadinessPromptOpen.value = false
   isReadinessOpen.value = false
-  unlockStep(5)
+  unlockStep(4)
   isRouteView.value = true
   window.scrollTo(0, 0)
   await nextTick()
@@ -2414,9 +2536,14 @@ onBeforeUnmount(() => {
 
 .planner-step-nav button.active,
 .planner-step-nav button.done {
-  background: var(--brand-lime);
-  color: #142016;
-  border-color: transparent;
+  background: #263028;
+  color: #fff;
+  border-color: rgba(35, 45, 39, 0.18);
+}
+
+.planner-step-nav button.done {
+  background: #f2d28a;
+  color: #2b2415;
 }
 
 .planner-step-nav button.locked {
@@ -2527,8 +2654,8 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: var(--brand-lime);
-  color: #142016;
+  background: #f2d28a;
+  color: #2b2415;
   font-size: 1.45rem;
   font-weight: 950;
 }
@@ -2572,6 +2699,11 @@ onBeforeUnmount(() => {
 .rv-legend-list {
   display: grid;
   gap: 12px;
+}
+
+.planner-route-panel .rv-legend-list {
+  grid-template-columns: 1fr;
+  gap: 5px;
 }
 
 .planner-choice-list,
@@ -2621,8 +2753,8 @@ onBeforeUnmount(() => {
 .planner-destination-card.is-selected,
 .planner-type-card:hover,
 .planner-type-card.active {
-  border-color: rgba(35, 45, 39, 0.22);
-  background: rgba(228, 248, 213, 0.78);
+  border-color: rgba(159, 100, 22, 0.34);
+  background: rgba(255, 239, 196, 0.82);
 }
 
 .planner-choice-icon,
@@ -2635,7 +2767,7 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: rgba(155, 224, 111, 0.24);
+  background: rgba(168, 212, 226, 0.28);
 }
 
 .planner-choice-icon img,
@@ -2678,6 +2810,67 @@ onBeforeUnmount(() => {
   font-size: 0.85rem;
   line-height: 1.4;
   font-style: italic;
+}
+
+.planner-shade-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(168, 212, 226, 0.16);
+  border: 1px solid rgba(78, 130, 146, 0.26);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.planner-shade-toggle:hover {
+  background: rgba(168, 212, 226, 0.24);
+  border-color: rgba(78, 130, 146, 0.45);
+}
+
+.planner-shade-toggle input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4e8292;
+}
+
+.planner-shade-toggle-icon {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  color: #4e8292;
+}
+
+.planner-shade-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.planner-shade-toggle-text strong {
+  color: var(--brand-ink-soft);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.planner-shade-toggle-text small {
+  color: var(--brand-ink-muted);
+  font-size: 0.8rem;
+}
+
+.planner-metric-chip-shade {
+  background: rgba(168, 212, 226, 0.16);
+  color: #315c69;
+}
+
+.planner-metric-chip-shade svg {
+  width: 18px;
+  height: 18px;
+  color: #4e8292;
 }
 
 .planner-search-results button {
@@ -2773,9 +2966,9 @@ onBeforeUnmount(() => {
 .planner-ready-btn,
 .planner-view-details,
 .planner-shopping-form button {
-  border-color: transparent;
-  background: var(--brand-lime);
-  color: #142016;
+  border-color: #263028;
+  background: #263028;
+  color: #fff;
 }
 
 .planner-back-btn,
@@ -2859,7 +3052,7 @@ onBeforeUnmount(() => {
   width: fit-content;
   padding: 12px 16px;
   border-radius: 16px;
-  background: rgba(155, 224, 111, 0.2);
+  background: rgba(255, 239, 196, 0.82);
 }
 
 .planner-selection-note-error {
@@ -2950,11 +3143,21 @@ onBeforeUnmount(() => {
 .planner-tag-row,
 .planner-metric-row,
 .planner-summary-actions,
+.planner-result-actions,
 .rv-stats-row {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.planner-result-actions {
+  margin-top: 10px;
+  justify-content: space-between;
+}
+
+.planner-result-actions .btn {
+  min-width: 148px;
 }
 
 .planner-rec-label,
@@ -2971,7 +3174,8 @@ onBeforeUnmount(() => {
 }
 
 .planner-score-badge.score-high {
-  background: var(--brand-lime);
+  background: rgba(168, 212, 226, 0.38);
+  color: #254f5d;
 }
 
 .planner-score-badge.score-medium {
@@ -3023,6 +3227,79 @@ onBeforeUnmount(() => {
 
 .planner-mini-map {
   min-height: 460px;
+}
+
+.planner-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+  padding: clamp(16px, 4vw, 34px);
+  display: grid;
+  place-items: center;
+  background: rgba(16, 19, 15, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.planner-detail-modal {
+  position: relative;
+  width: min(100%, 720px);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  padding: clamp(22px, 4vw, 34px);
+}
+
+.planner-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--brand-line);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--brand-ink-soft);
+  font-weight: 950;
+}
+
+.planner-detail-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.planner-detail-grid .planner-metric-chip {
+  justify-content: center;
+}
+
+.planner-detail-info-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.planner-detail-info-list > div {
+  display: grid;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 1px solid var(--brand-line-soft);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.planner-detail-info-list strong {
+  color: var(--brand-ink-soft);
+  font-weight: 950;
+}
+
+.planner-detail-info-list span {
+  color: var(--brand-ink-muted);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.planner-detail-facility-grid {
+  margin-top: 14px;
 }
 
 .planner-detail-layout {
@@ -3078,10 +3355,41 @@ onBeforeUnmount(() => {
 }
 
 .planner-readiness-modal {
+  position: relative;
   width: min(100%, 880px);
   max-height: min(92vh, 980px);
   overflow: auto;
   padding: clamp(22px, 4vw, 36px);
+}
+
+.planner-readiness-prompt {
+  width: min(100%, 760px);
+  overflow: auto;
+  padding: clamp(28px, 4vw, 40px);
+}
+
+.planner-readiness-prompt .planner-readiness-head h2 {
+  max-width: 13ch;
+  font-size: clamp(2.15rem, 5vw, 3.6rem);
+  line-height: 1.08;
+}
+
+.planner-readiness-prompt .planner-readiness-advice {
+  margin-top: 22px;
+  padding: 18px 22px;
+  font-size: clamp(1.05rem, 2vw, 1.28rem);
+  line-height: 1.55;
+}
+
+.planner-prompt-actions {
+  justify-content: flex-start;
+  margin-top: 24px;
+  gap: 14px;
+}
+
+.planner-prompt-actions .btn {
+  min-width: 142px;
+  padding-inline: 24px;
 }
 
 .planner-readiness-head {
@@ -3178,61 +3486,84 @@ onBeforeUnmount(() => {
 .planner-route-shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: 390px 1fr;
+  grid-template-columns: 430px 1fr;
   overflow: hidden;
 }
 
 .planner-route-panel {
   position: relative;
   z-index: 2;
-  overflow: auto;
-  padding: 22px;
+  overflow: hidden;
+  padding: 14px;
   background: var(--brand-paper-white);
   border-right: 1px solid var(--brand-line);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 11px;
 }
 
 .rv-back-btn {
   width: fit-content;
-  background: #f5d8cf;
-  color: #743927;
-  border-color: rgba(151, 68, 49, 0.18);
+  min-height: 54px;
+  margin-bottom: 4px;
+  padding: 0 30px;
+  border-color: var(--brand-line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--brand-ink-soft);
+  font-size: 1.05rem;
 }
 
 .rv-back-btn:hover {
-  background: #efc9bd;
+  background: #fff;
 }
 
-.rv-back-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: #fff;
-  color: #743927;
+.planner-route-panel .rv-dest-header {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.planner-route-panel .rv-dest-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+}
+
+.planner-route-panel .rv-dest-icon-wrap img {
+  width: 20px;
+  height: 20px;
+}
+
+.planner-route-panel .rv-dest-type-label {
+  font-size: 0.78rem;
 }
 
 .rv-dest-name {
   margin: 0;
   font-family: var(--font-body);
   color: var(--brand-ink-soft);
-  font-size: 1.35rem;
+  font-size: 1.08rem;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
+.rv-dest-address {
+  margin-top: 3px;
+  color: var(--brand-ink-muted);
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.32;
+}
+
 .rv-stats-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .rv-stat-card {
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .rv-stat-main {
@@ -3244,7 +3575,7 @@ onBeforeUnmount(() => {
 
 .rv-stat-card strong {
   color: #1b5e20;
-  font-size: 1.8rem;
+  font-size: 1.28rem;
   font-weight: 950;
   line-height: 1;
 }
@@ -3260,7 +3591,7 @@ onBeforeUnmount(() => {
 
 .rv-section {
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .rv-fac-grid {
@@ -3269,8 +3600,23 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
+.rv-route-fac-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.planner-route-panel .rv-fac-card img {
+  width: 20px;
+  height: 20px;
+}
+
+.planner-route-panel .rv-section h3 {
+  font-size: 0.9rem;
+}
+
 .rv-fac-card {
-  padding: 12px;
+  min-height: 78px;
+  padding: 7px;
   display: grid;
   place-items: center;
   gap: 6px;
@@ -3280,7 +3626,7 @@ onBeforeUnmount(() => {
 .rv-fac-card strong {
   display: block;
   color: var(--brand-ink-soft);
-  font-size: 1.4rem;
+  font-size: 1.02rem;
   font-weight: 950;
   line-height: 1;
 }
@@ -3314,37 +3660,38 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   color: var(--brand-ink-muted);
-  font-size: 1rem;
+  min-height: 37px;
+  font-size: 1.12rem;
   font-weight: 800;
 }
 
 .rv-legend-icon {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  flex: 0 0 32px;
+  flex: 0 0 34px;
   display: grid;
   place-items: center;
 }
 
-.rv-licon-start { background: #a8d4e2; border: 2.5px solid #4e8292; }
-.rv-licon-dest { background: #efa62b; border: 2.5px solid #9f6416; }
-.rv-licon-bench { background: #7cb342; border: 2.5px solid #558b2f; }
-.rv-licon-toilet { background: #2196f3; border: 2.5px solid #1565c0; }
-.rv-licon-fountain { background: #00bcd4; border: 2.5px solid #0097a7; }
+.rv-licon-start { background: #a8d4e2; border: 2px solid #4e8292; }
+.rv-licon-dest { background: #efa62b; border: 2px solid #9f6416; }
+.rv-licon-bench { background: #7cb342; border: 2px solid #558b2f; }
+.rv-licon-toilet { background: #2196f3; border: 2px solid #1565c0; }
+.rv-licon-fountain { background: #00bcd4; border: 2px solid #0097a7; }
 
 .rv-ldot {
   flex: 0 0 auto;
 }
 
 .rv-ldot-route {
-  width: 28px;
+  width: 34px;
   height: 5px;
   border-top: 4px dashed #2e7d32;
 }
 
 .rv-ldot-shade {
-  width: 28px;
+  width: 34px;
   height: 16px;
   border-radius: 5px;
   border: 1px solid rgba(76, 131, 67, 0.34);
@@ -3403,6 +3750,10 @@ onBeforeUnmount(() => {
   display: grid;
   justify-items: center;
   pointer-events: auto;
+}
+
+.planner-marker-highlighted {
+  z-index: 80;
 }
 
 .rv-pin-start {
@@ -3494,7 +3845,7 @@ onBeforeUnmount(() => {
     margin-right: auto;
     margin-top: calc(var(--nav-h) + 36px);
     transform: none;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -3550,7 +3901,7 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) {
   .planner-step-nav {
     width: min(100% - 24px, 520px);
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 5px;
   }
 
