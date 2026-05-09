@@ -236,7 +236,7 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
   gap: clamp(18px, 3vw, 32px);
   padding: 10px 16px 10px 28px;
   border-radius: 20px;
-  background: rgba(252, 247, 235, 0.88);
+  background: rgba(255, 255, 252, 0.9);
   border: 1px solid var(--brand-line);
   box-shadow: var(--brand-shadow-nav);
   backdrop-filter: blur(16px) saturate(130%);
@@ -249,7 +249,7 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
 
 .nav--scrolled .nav__inner {
   transform: translateY(-6px);
-  background: rgba(252, 247, 235, 0.96);
+  background: rgba(255, 255, 252, 0.96);
 }
 
 .brand {
@@ -266,6 +266,7 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
   display: block;
   object-fit: cover;
   object-position: center;
+  filter: brightness(0) saturate(100%);
 }
 
 .nav__links {
@@ -335,7 +336,7 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
   gap: 6px;
   padding: 10px;
   border-radius: 18px;
-  background: rgba(252, 247, 235, 0.98);
+  background: rgba(255, 255, 252, 0.98);
   border: 1px solid var(--brand-line);
   box-shadow: 0 24px 56px -34px rgba(35, 45, 39, 0.45);
   opacity: 0;
@@ -411,7 +412,7 @@ const isAboutActive = () => aboutLinks.some((link) => route.path === link.path);
   gap: 10px;
   padding: 18px;
   border-radius: 22px;
-  background: rgba(252, 247, 235, 0.96);
+  background: rgba(255, 255, 252, 0.96);
   border: 1px solid var(--brand-line);
   box-shadow: 0 24px 60px -36px rgba(35, 45, 39, 0.38);
   pointer-events: none;

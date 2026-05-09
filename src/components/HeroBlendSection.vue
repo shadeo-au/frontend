@@ -4,7 +4,8 @@ import BrandWatermark from './BrandWatermark.vue';
 withDefaults(
   defineProps<{
     id?: string;
-    imageSrc: string;
+    imageSrc?: string;
+    videoSrc?: string;
     imageAlt?: string;
     sideLabel?: string;
   }>(),
@@ -22,7 +23,16 @@ withDefaults(
     <span v-if="sideLabel" class="hero-blend__side-label">{{ sideLabel }}</span>
 
     <div class="hero-blend__art" aria-hidden="true">
-      <img :src="imageSrc" :alt="imageAlt" />
+      <video
+        v-if="videoSrc"
+        :src="videoSrc"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="metadata"
+      />
+      <img v-else-if="imageSrc" :src="imageSrc" :alt="imageAlt" />
     </div>
 
     <div class="hero-blend__copy" data-rise>
@@ -40,6 +50,7 @@ withDefaults(
   contain: layout paint style;
   display: grid;
   align-items: center;
+  justify-items: end;
   padding: calc(var(--nav-h) + 56px) max(var(--gutter), calc((100vw - 1280px) / 2)) 58px;
   background:
     radial-gradient(circle at 78% 38%, var(--brand-glow-lime), transparent 0 28%, transparent 48%),
@@ -62,13 +73,8 @@ withDefaults(
 
 .hero-blend__art {
   position: absolute;
-  inset:
-    calc(var(--nav-h) + 34px)
-    max(18px, calc((100vw - 1280px) / 2))
-    28px
-    max(18px, calc((100vw - 1280px) / 2));
+  inset: 0;
   z-index: 1;
-  border-radius: 58px;
   overflow: hidden;
   will-change: transform, opacity;
   animation: hb-art-in 1.2s cubic-bezier(0.16, 0.84, 0.44, 1) 0.08s both;
@@ -80,43 +86,55 @@ withDefaults(
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(90deg, rgba(251, 250, 247, 0.98) 0%, rgba(251, 250, 247, 0.92) 26%, rgba(251, 250, 247, 0.56) 46%, rgba(251, 250, 247, 0.12) 66%, transparent 82%),
-    linear-gradient(0deg, rgba(251, 250, 247, 0.82) 0%, rgba(251, 250, 247, 0.18) 22%, transparent 44%);
+    linear-gradient(90deg, rgba(12, 24, 18, 0.56) 0%, rgba(12, 24, 18, 0.34) 34%, rgba(12, 24, 18, 0.12) 64%, transparent 100%),
+    linear-gradient(0deg, rgba(12, 24, 18, 0.46) 0%, rgba(12, 24, 18, 0.14) 36%, transparent 68%);
   pointer-events: none;
 }
 
-.hero-blend__art img {
+.hero-blend__art img,
+.hero-blend__art video {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: right center;
+  display: block;
+  object-fit: cover;
+  object-position: center;
 }
 
 .hero-blend__copy {
   position: relative;
   z-index: 2;
-  width: min(45vw, 610px);
+  width: min(45vw, 690px);
   display: flex;
   flex-direction: column;
   gap: 24px;
+  align-items: flex-start;
+  justify-self: end;
+  text-align: left;
+  margin-inline-end: calc(clamp(72px, 8vw, 144px) * -1);
   will-change: transform, opacity;
   animation: hb-copy-in 0.88s cubic-bezier(0.16, 0.84, 0.44, 1) 0.32s both;
 }
 
 .hero-blend :slotted(h1) {
-  max-width: 10.5ch;
-  color: var(--brand-ink);
+  max-width: 16ch;
+  color: var(--brand-paper-white);
   font-family: var(--font-body);
   font-size: var(--brand-fs-hero);
   font-weight: 950;
-  line-height: 1;
+  line-height: 0.96;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
+.hero-blend :slotted(h1 em) {
+  display: inline;
+  color: #ffcf3d;
+  font-style: normal;
+}
+
 .hero-blend :slotted(p) {
-  max-width: 38ch;
-  color: var(--brand-ink-muted);
+  max-width: 48ch;
+  color: rgba(251, 250, 247, 0.88);
   font-size: var(--brand-fs-lead);
   font-weight: 650;
   line-height: var(--brand-lh-copy);
@@ -156,19 +174,21 @@ withDefaults(
 
 @media (max-width: 980px) {
   .hero-blend {
-    min-height: auto;
+    min-height: 100vh;
     padding-top: calc(var(--nav-h) + 44px);
-    padding-bottom: 430px;
+    padding-bottom: 58px;
   }
 
   .hero-blend__copy {
     width: min(100%, 680px);
+    align-items: flex-start;
+    justify-self: start;
+    text-align: left;
+    margin-inline-end: 0;
   }
 
   .hero-blend__art {
-    inset: auto var(--gutter) 28px var(--gutter);
-    height: 410px;
-    border-radius: 42px;
+    inset: 0;
   }
 
   .hero-blend :slotted(h1) {
@@ -180,12 +200,6 @@ withDefaults(
 @media (max-width: 640px) {
   .hero-blend {
     padding-inline: var(--gutter);
-    padding-bottom: 340px;
-  }
-
-  .hero-blend__art {
-    height: 320px;
-    border-radius: 30px;
   }
 
   .hero-blend__side-label {

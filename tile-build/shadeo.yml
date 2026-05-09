@@ -1,0 +1,175 @@
+schema_name: Shadeo
+schema_description: Pedestrian-focused vector schema for the Shadeo walking planner. Built from a single OSM PBF, no external sources required.
+attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>'
+
+args:
+  area:
+    description: Area name (used by planetiler for default download)
+    default: melbourne
+
+sources:
+  osm:
+    type: osm
+    url: geofabrik:australia-oceania/australia/victoria
+    local_path: extract/melbourne.osm.pbf
+
+tag_mappings:
+  highway:
+    type: string
+  surface:
+    type: string
+  covered:
+    type: string
+  width:
+    type: string
+  lit:
+    type: string
+  area:
+    type: string
+  building:
+    type: string
+  natural:
+    type: string
+  waterway:
+    type: string
+  landuse:
+    type: string
+  leisure:
+    type: string
+  place:
+    type: string
+  name:
+    type: string
+
+layers:
+  - id: water
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 6
+        include_when:
+          __any__:
+            natural: water
+            waterway: [river, canal, stream]
+            landuse: reservoir
+        attributes:
+          - key: name
+          - key: class
+            value:
+              coalesce:
+                - tag_value: natural
+                - tag_value: waterway
+
+  - id: landuse
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 8
+        include_when:
+          __any__:
+            landuse: [park, residential, commercial, retail, industrial, cemetery, grass]
+            leisure: [park, garden, pitch, playground, sports_centre]
+            natural: [wood, scrub, grassland]
+        attributes:
+          - key: class
+            value:
+              coalesce:
+                - tag_value: leisure
+                - tag_value: landuse
+                - tag_value: natural
+          - key: name
+
+  - id: road_major
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 6
+        include_when:
+          highway: [motorway, motorway_link, trunk, trunk_link, primary, primary_link, secondary, secondary_link]
+        attributes:
+          - key: class
+            tag_value: highway
+          - key: name
+          - key: oneway
+
+  - id: road_minor
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 12
+        include_when:
+          highway: [tertiary, tertiary_link, residential, service, unclassified, living_street, road]
+        attributes:
+          - key: class
+            tag_value: highway
+          - key: name
+          - key: oneway
+
+  - id: pedestrian
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 13
+        # KEY layer: keep all original OSM way vertices, do NOT simplify
+        # otherwise routes will not align with rendered footways
+        min_size: 0
+        tolerance: 0
+        include_when:
+          highway: [footway, path, pedestrian, steps, cycleway, track, bridleway, corridor]
+        # exclude footways that are part of a road sidewalk tag (avoid double rendering)
+        # (sidewalk= is on roads, not on separate ways, so this is mostly noop)
+        attributes:
+          - key: class
+            tag_value: highway
+          - key: surface
+          - key: covered
+          - key: width
+          - key: lit
+          - key: name
+          - key: tunnel
+          - key: bridge
+
+  - id: pedestrian_area
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 14
+        include_when:
+          __any__:
+            __all__:
+              highway: pedestrian
+              area: 'yes'
+            highway: [footway, path]
+        # only when explicitly tagged as area
+        exclude_when:
+          area: 'no'
+        attributes:
+          - key: class
+            tag_value: highway
+
+  - id: building
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 14
+        include_when:
+          building: __any__
+        attributes:
+          - key: name
+          - key: height
+          - key: levels
+            tag_value: building:levels
+
+  - id: place
+    features:
+      - source: osm
+        geometry: point
+        min_zoom: 8
+        include_when:
+          place: [city, town, suburb, neighbourhood, village, hamlet]
+        attributes:
+          - key: class
+            tag_value: place
+          - key: name
+          - key: rank
+            tag_value: place_rank

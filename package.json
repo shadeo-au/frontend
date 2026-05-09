@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@iconify/vue": "^5.0.1",
     "@vitejs/plugin-vue": "^5.2.3",
     "maplibre-gl": "^5.24.0",
     "pmtiles": "^4.4.1",

@@ -36,3 +36,4 @@ install.cmd
 # OS/archive scratch
 *.tmp
 *.temp
+backend/

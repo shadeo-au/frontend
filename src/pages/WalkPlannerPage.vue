@@ -83,9 +83,16 @@
             :class="{ active: selectedStart?.id === place.id }"
             @click="selectStartPlace(place)"
           >
-            <strong>{{ place.name }}</strong>
-            <small>{{ place.address }}</small>
+            <Icon class="planner-search-result-icon" :icon="categoryDisplay(place).icon" aria-hidden="true" />
+            <span class="planner-search-result-text">
+              <strong>{{ place.name }}</strong>
+              <small>{{ place.address }}</small>
+              <span v-if="place.category" class="planner-search-result-tag">{{ categoryDisplay(place).label }}</span>
+            </span>
           </button>
+          <p v-if="startOutOfAreaCount > 0" class="planner-search-hint">
+            {{ startOutOfAreaCount }} more result{{ startOutOfAreaCount === 1 ? '' : 's' }} outside our Central Melbourne coverage hidden.
+          </p>
         </div>
 
         <p v-if="selectedStart" class="planner-selection-note">
@@ -162,9 +169,16 @@
             :class="{ active: selectedSpecificDestination?.id === place.id }"
             @click="selectSpecificDestination(place)"
           >
-            <strong>{{ place.name }}</strong>
-            <small>{{ place.address }}</small>
+            <Icon class="planner-search-result-icon" :icon="categoryDisplay(place).icon" aria-hidden="true" />
+            <span class="planner-search-result-text">
+              <strong>{{ place.name }}</strong>
+              <small>{{ place.address }}</small>
+              <span v-if="place.category" class="planner-search-result-tag">{{ categoryDisplay(place).label }}</span>
+            </span>
           </button>
+          <p v-if="destinationOutOfAreaCount > 0" class="planner-search-hint">
+            {{ destinationOutOfAreaCount }} more result{{ destinationOutOfAreaCount === 1 ? '' : 's' }} outside our Central Melbourne coverage hidden.
+          </p>
         </div>
 
         <p v-if="destinationReadyLabel" class="planner-selection-note">
@@ -558,6 +572,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Protocol } from 'pmtiles'
 import AppNav from '../components/AppNav.vue'
+import { Icon } from '@iconify/vue'
 import pharmacyIcon from '../assets/svg/pharmacy.svg'
 import groceryIcon from '../assets/svg/grocery.svg'
 import clinicIcon from '../assets/svg/clinic.svg'
@@ -576,11 +591,11 @@ const DEFAULT_MAP_CENTER = { lat: -37.8136, lng: 144.9631 }
 const MAP_VIEW_BOUNDS = [[-37.895, 144.875], [-37.735, 145.055]]
 const MAP_MIN_ZOOM = 12
 const MAP_MAX_ZOOM = Number(import.meta.env.VITE_MAP_MAX_ZOOM || 18)
-const PMTILES_MAX_DATA_ZOOM = Number(import.meta.env.VITE_PMTILES_MAX_DATA_ZOOM || 14)
+const PMTILES_MAX_DATA_ZOOM = Number(import.meta.env.VITE_PMTILES_MAX_DATA_ZOOM || 16)
 const MUNICIPAL_BOUNDARY_URL = '/data/municipal-boundary.geojson'
 const SUPPORTED_AREA_ERROR = 'This location is outside the supported Central Melbourne area.'
 const MAP_STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || '/styles/positron/style.json'
-const PMTILES_URL = import.meta.env.VITE_PMTILES_URL || 'https://pub-64269a193cf745e5b366a287e94c5196.r2.dev/maps/melbourne.pmtiles'
+const PMTILES_URL = import.meta.env.VITE_PMTILES_URL || 'https://pub-64269a193cf745e5b366a287e94c5196.r2.dev/maps/melbourne-v2.pmtiles'
 const MAP_GLYPHS_URL = import.meta.env.VITE_MAP_GLYPHS_URL || '/fonts/{fontstack}/{range}.pbf'
 const MAP_SPRITE_URL = import.meta.env.VITE_MAP_SPRITE_URL || '/styles/positron/sprite'
 const ROUTE_SERVICE_URL = import.meta.env.VITE_ROUTE_SERVICE_URL || 'https://krdihvgnt5.execute-api.ap-southeast-2.amazonaws.com/default/new-route-service'
@@ -684,6 +699,8 @@ const startQuery = ref('')
 const destinationQuery = ref('')
 const startSearchResults = ref([])
 const destinationSearchResults = ref([])
+const startOutOfAreaCount = ref(0)
+const destinationOutOfAreaCount = ref(0)
 const recommendations = ref([])
 const highlightedRecommendationId = ref('')
 const isSearchingStart = ref(false)
@@ -985,18 +1002,88 @@ const inferDestinationType = (place) => {
   if (source.includes('park') || source.includes('garden')) return 'park'
   return ''
 }
+// Maps each backend POI category (from sqlite_service / OSM) to a Google
+// Material Symbols icon name + short human label. Iconify loads each named
+// icon on demand from the bundled material-symbols dataset.
+//
+// Browse / search icon names: https://fonts.google.com/icons (use the
+// snake_case → kebab-case conversion that iconify expects)
+const POI_CATEGORY_DISPLAY = {
+  // Transport
+  transit: { icon: 'material-symbols:train', label: 'Station' },
+  // Food / drink
+  cafe: { icon: 'material-symbols:local-cafe', label: 'Cafe' },
+  restaurant: { icon: 'material-symbols:restaurant', label: 'Restaurant' },
+  fast_food: { icon: 'material-symbols:fastfood', label: 'Fast food' },
+  pub: { icon: 'material-symbols:sports-bar', label: 'Pub' },
+  bar: { icon: 'material-symbols:local-bar', label: 'Bar' },
+  ice_cream: { icon: 'material-symbols:icecream', label: 'Ice cream' },
+  bakery: { icon: 'material-symbols:bakery-dining', label: 'Bakery' },
+  butcher: { icon: 'material-symbols:storefront', label: 'Butcher' },
+  greengrocer: { icon: 'material-symbols:grocery', label: 'Greengrocer' },
+  // Health
+  pharmacy: { icon: 'material-symbols:local-pharmacy', label: 'Pharmacy' },
+  hospital: { icon: 'material-symbols:local-hospital', label: 'Hospital' },
+  clinic: { icon: 'material-symbols:medical-services', label: 'Clinic' },
+  dentist: { icon: 'material-symbols:dentistry', label: 'Dentist' },
+  // Shops
+  supermarket: { icon: 'material-symbols:shopping-cart', label: 'Supermarket' },
+  convenience: { icon: 'material-symbols:storefront', label: 'Convenience' },
+  mall: { icon: 'material-symbols:local-mall', label: 'Mall' },
+  department_store: { icon: 'material-symbols:store', label: 'Department store' },
+  clothes: { icon: 'material-symbols:checkroom', label: 'Clothing' },
+  books: { icon: 'material-symbols:menu-book', label: 'Bookshop' },
+  electronics: { icon: 'material-symbols:devices', label: 'Electronics' },
+  hardware: { icon: 'material-symbols:hardware', label: 'Hardware' },
+  florist: { icon: 'material-symbols:local-florist', label: 'Florist' },
+  gift: { icon: 'material-symbols:redeem', label: 'Gift shop' },
+  market: { icon: 'material-symbols:storefront', label: 'Market' },
+  // Civic
+  library: { icon: 'material-symbols:local-library', label: 'Library' },
+  school: { icon: 'material-symbols:school', label: 'School' },
+  university: { icon: 'material-symbols:school', label: 'University' },
+  bank: { icon: 'material-symbols:account-balance', label: 'Bank' },
+  atm: { icon: 'material-symbols:local-atm', label: 'ATM' },
+  post_office: { icon: 'material-symbols:local-post-office', label: 'Post office' },
+  place_of_worship: { icon: 'material-symbols:church', label: 'Place of worship' },
+  community_centre: { icon: 'material-symbols:groups', label: 'Community centre' },
+  // Leisure
+  park: { icon: 'material-symbols:park', label: 'Park' },
+  playground: { icon: 'material-symbols:swing', label: 'Playground' },
+  fitness: { icon: 'material-symbols:fitness-center', label: 'Fitness centre' },
+  swimming_pool: { icon: 'material-symbols:pool', label: 'Pool' },
+  fountain: { icon: 'material-symbols:water-drop', label: 'Fountain' },
+  // Tourism / culture
+  attraction: { icon: 'material-symbols:attractions', label: 'Attraction' },
+  museum: { icon: 'material-symbols:museum', label: 'Museum' },
+  gallery: { icon: 'material-symbols:palette', label: 'Gallery' },
+  hotel: { icon: 'material-symbols:hotel', label: 'Hotel' },
+  viewpoint: { icon: 'material-symbols:landscape', label: 'Viewpoint' },
+  tourist_info: { icon: 'material-symbols:info', label: 'Tourist info' },
+  artwork: { icon: 'material-symbols:image', label: 'Artwork' },
+  cinema: { icon: 'material-symbols:movie', label: 'Cinema' },
+  theatre: { icon: 'material-symbols:theater-comedy', label: 'Theatre' },
+}
+
+const FALLBACK_CATEGORY_DISPLAY = { icon: 'material-symbols:location-on', label: 'Place' }
+
+const categoryDisplay = (place) =>
+  POI_CATEGORY_DISPLAY[place?.category] || FALLBACK_CATEGORY_DISPLAY
+
 const normalisePlaceSearchResults = (payload) => Array.isArray(payload?.places)
   ? payload.places
     .map((place, index) => {
       const lat = Number(place.lat ?? place.latitude)
       const lng = Number(place.lng ?? place.longitude)
+      const categories = Array.isArray(place.categories) ? place.categories : []
       return {
         id: place.placeId || place.id || `${place.name || 'place'}-${lat}-${lng}-${index}`,
         placeId: place.placeId || place.id || null,
         name: place.name || 'Search result',
         address: place.address || place.formattedAddress || place.vicinity || '',
         type: inferDestinationType(place),
-        categories: Array.isArray(place.categories) ? place.categories : [],
+        category: categories[0] || place.resultType || '',
+        categories,
         lat,
         lng
       }
@@ -1009,7 +1096,10 @@ const searchPlaces = async (query) => {
   if (!response.ok) {
     throw new Error(payload.error || payload.message || `Place search failed (${response.status})`)
   }
-  return normalisePlaceSearchResults(payload)
+  return {
+    places: normalisePlaceSearchResults(payload),
+    outOfAreaCount: Number(payload?.outOfAreaCount) || 0,
+  }
 }
 let weatherRequestKey = ''
 const weatherEndpoint = (place) => {
@@ -1210,10 +1300,17 @@ const runStartSearch = async () => {
   isSearchingStart.value = true
   startValidationMessage.value = ''
   try {
-    startSearchResults.value = await searchPlaces(startQuery.value)
-    if (!startSearchResults.value.length) startValidationMessage.value = 'No matching places were returned. Try a more specific address or landmark.'
+    const result = await searchPlaces(startQuery.value)
+    startSearchResults.value = result.places
+    startOutOfAreaCount.value = result.outOfAreaCount
+    if (!result.places.length) {
+      startValidationMessage.value = result.outOfAreaCount > 0
+        ? `No matches in Central Melbourne. Found ${result.outOfAreaCount} result${result.outOfAreaCount === 1 ? '' : 's'} outside our coverage area — try a closer place.`
+        : 'No matching places were returned. Try a more specific address or landmark.'
+    }
   } catch (error) {
     startSearchResults.value = []
+    startOutOfAreaCount.value = 0
     startValidationMessage.value = error instanceof Error ? error.message : 'Place search failed.'
   } finally {
     isSearchingStart.value = false
@@ -1243,15 +1340,60 @@ const runDestinationSearch = async () => {
   isSearchingDestination.value = true
   destinationValidationMessage.value = ''
   try {
-    destinationSearchResults.value = await searchPlaces(destinationQuery.value)
-    if (!destinationSearchResults.value.length) destinationValidationMessage.value = 'No matching destinations were returned. Try a more specific place name.'
+    const result = await searchPlaces(destinationQuery.value)
+    destinationSearchResults.value = result.places
+    destinationOutOfAreaCount.value = result.outOfAreaCount
+    if (!result.places.length) {
+      destinationValidationMessage.value = result.outOfAreaCount > 0
+        ? `No matches in Central Melbourne. Found ${result.outOfAreaCount} result${result.outOfAreaCount === 1 ? '' : 's'} outside our coverage area — try a closer place.`
+        : 'No matching destinations were returned. Try a more specific place name.'
+    }
   } catch (error) {
     destinationSearchResults.value = []
+    destinationOutOfAreaCount.value = 0
     destinationValidationMessage.value = error instanceof Error ? error.message : 'Destination search failed.'
   } finally {
     isSearchingDestination.value = false
   }
 }
+
+const SEARCH_DEBOUNCE_MS = 400
+const SEARCH_MIN_CHARS = 3
+let startSearchDebounce = null
+let destinationSearchDebounce = null
+
+watch(startQuery, (value) => {
+  if (startSearchDebounce) {
+    clearTimeout(startSearchDebounce)
+    startSearchDebounce = null
+  }
+  if (!value || value.trim().length < SEARCH_MIN_CHARS) {
+    startSearchResults.value = []
+    return
+  }
+  startSearchDebounce = setTimeout(() => {
+    runStartSearch()
+  }, SEARCH_DEBOUNCE_MS)
+})
+
+watch(destinationQuery, (value) => {
+  if (destinationSearchDebounce) {
+    clearTimeout(destinationSearchDebounce)
+    destinationSearchDebounce = null
+  }
+  if (!value || value.trim().length < SEARCH_MIN_CHARS) {
+    destinationSearchResults.value = []
+    return
+  }
+  destinationSearchDebounce = setTimeout(() => {
+    runDestinationSearch()
+  }, SEARCH_DEBOUNCE_MS)
+})
+
+onBeforeUnmount(() => {
+  if (startSearchDebounce) clearTimeout(startSearchDebounce)
+  if (destinationSearchDebounce) clearTimeout(destinationSearchDebounce)
+})
 const selectSpecificDestination = async (place) => {
   if (samePlace(selectedSpecificDestination.value, place)) return
   destinationValidationMessage.value = ''
@@ -1478,7 +1620,7 @@ const loadMapStyle = async () => {
             url: `pmtiles://${PMTILES_URL}`,
             minzoom: 0,
             maxzoom: PMTILES_MAX_DATA_ZOOM,
-            bounds: [144.266, -38.552, 145.81, -37.365]
+            bounds: [144.875, -37.895, 145.055, -37.735]
           }
         }
       }))
@@ -2525,6 +2667,54 @@ onBeforeUnmount(() => {
   color: var(--brand-ink-muted);
   font-size: 1rem;
   line-height: 1.45;
+}
+
+.planner-search-hint {
+  margin: 8px 4px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(180, 180, 180, 0.08);
+  color: var(--brand-ink-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.planner-search-results button {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.planner-search-result-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  color: var(--brand-ink-soft);
+  /* Iconify renders SVG inline; this sets stroke / fill via currentColor */
+}
+
+.planner-search-result-text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.planner-search-result-tag {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(120, 180, 120, 0.18);
+  color: var(--brand-ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .planner-search-box {

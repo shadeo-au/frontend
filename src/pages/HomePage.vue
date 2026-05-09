@@ -186,12 +186,16 @@ onBeforeUnmount(() => {
     <main>
       <HeroBlendSection
         id="hero"
-        image-src="/herosection.png"
+        video-src="/hero.mp4"
       >
-        <h1>Helping seniors stay cool outdoors.</h1>
+        <h1>
+          A <em>gentler way</em><br />
+          through<br />
+          hot days.
+        </h1>
         <p>
-          Shadeo helps older adults and carers understand heat risk, find cooler places,
-          and make safer walking decisions before the day gets too hot.
+          Shadeo helps older adults and carers plan cooler routes, understand local heat,
+          and step outside with more confidence.
         </p>
       </HeroBlendSection>
 
