@@ -25,11 +25,11 @@ withDefaults(
     <BrandWatermark v-if="sideWatermark" placement="side" />
     <span v-if="sideLabel" class="page-section__side-label">{{ sideLabel }}</span>
 
-    <div class="page-section__copy" data-rise>
+    <div class="page-section__copy">
       <slot name="copy" />
     </div>
 
-    <div class="page-section__visual" data-rise style="--rise-delay: 90ms">
+    <div class="page-section__visual" data-scroll-fade style="--fade-delay: 260ms">
       <slot name="visual" />
     </div>
   </section>
@@ -98,6 +98,19 @@ withDefaults(
 .page-section__visual {
   position: relative;
   z-index: 1;
+}
+
+[data-scroll-fade] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 1040ms var(--ease-out-expo) var(--fade-delay, 0ms),
+    transform 1040ms var(--ease-out-expo) var(--fade-delay, 0ms);
+}
+
+[data-scroll-fade].is-in {
+  opacity: 1;
+  transform: none;
 }
 
 .page-section :slotted(h2) {
@@ -171,6 +184,14 @@ withDefaults(
 
   .page-section :slotted(p) {
     max-width: 34ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll-fade] {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 </style>

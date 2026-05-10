@@ -108,7 +108,25 @@ watch(() => [route.path, route.hash], () => {
 <template>
   <header :class="['nav', { 'nav--scrolled': scrolled }]">
     <div class="nav__inner">
-      <a href="/#hero" class="brand" aria-label="Shadeo home" @click="closeMenu">Shadeo</a>
+      <a href="/#hero" class="brand" aria-label="Shadeo home" @click="closeMenu">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 42 42" role="img">
+            <path
+              class="brand__sun"
+              d="M31.8 10.8a3.8 3.8 0 1 1-7.6 0 3.8 3.8 0 0 1 7.6 0Z"
+            />
+            <path
+              class="brand__leaf"
+              d="M8.3 29.6c2.6-11.8 11.8-18.7 25.5-19.4-1.8 13.9-10.2 22.2-23.8 23.5 3.3-5.7 8-10.2 14.3-13.2-6.8 1.5-12.3 4.5-16 9.1Z"
+            />
+            <path
+              class="brand__path"
+              d="M9.7 33.4c6.4-.1 12-2.4 16.9-6.9"
+            />
+          </svg>
+        </span>
+        <span class="brand__word">Shadeo</span>
+      </a>
 
       <nav class="nav__links" aria-label="Primary" @mouseleave="onLinkLeave">
         <span class="nav__hover-bg" :style="hoverStyle" aria-hidden="true" />
@@ -184,11 +202,50 @@ watch(() => [route.path, route.hash], () => {
 }
 
 .brand {
-  color: var(--brand-ink-soft);
-  font-family: var(--font-body);
-  font-size: 1.35rem;
-  font-weight: 900;
+  color: var(--brand-ink);
+  font-family: var(--font-editorial);
+  font-size: 1.48rem;
+  font-weight: 600;
   letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand__mark {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 72% 24%, rgba(239, 166, 43, 0.18), transparent 28%),
+    rgba(228, 248, 213, 0.72);
+  border: 1px solid rgba(35, 45, 39, 0.1);
+}
+
+.brand__mark svg {
+  width: 27px;
+  height: 27px;
+}
+
+.brand__leaf {
+  fill: var(--shade-deep);
+}
+
+.brand__sun {
+  fill: var(--brand-gold);
+}
+
+.brand__path {
+  fill: none;
+  stroke: var(--brand-paper-white);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+}
+
+.brand__word {
+  transform: translateY(-1px);
 }
 
 .nav__links {
@@ -207,16 +264,18 @@ watch(() => [route.path, route.hash], () => {
   align-items: center;
   justify-content: center;
   padding: 0 18px;
-  color: var(--brand-ink-muted);
+  color: rgba(38, 48, 40, 0.78);
   font-size: 0.98rem;
-  font-weight: 700;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   white-space: nowrap;
   transition: color var(--d-fast) ease;
 }
 
 .nav__link:hover,
 .nav__link.is-active {
-  color: #23342a;
+  color: var(--shade-deep);
 }
 
 .nav__hover-bg,
@@ -234,7 +293,7 @@ watch(() => [route.path, route.hash], () => {
 .nav__hover-bg {
   inset-block: 8px;
   border-radius: 6px;
-  background: rgba(155, 224, 111, 0.09);
+  background: rgba(155, 224, 111, 0.06);
 }
 
 .nav__active-line,
@@ -242,11 +301,11 @@ watch(() => [route.path, route.hash], () => {
   bottom: 7px;
   height: 2px;
   border-radius: 999px;
-  background: rgba(139, 202, 93, 0.72);
+  background: linear-gradient(90deg, var(--brand-gold), var(--brand-lime-hover));
 }
 
 .nav__hover-line {
-  background: rgba(98, 133, 107, 0.38);
+  background: linear-gradient(90deg, var(--brand-lime-hover), var(--shade-deep));
 }
 
 .nav__burger {
@@ -300,8 +359,10 @@ watch(() => [route.path, route.hash], () => {
   padding: 13px 16px;
   border-radius: 8px;
   color: var(--brand-ink-muted);
-  font-size: 1.125rem;
-  font-weight: 800;
+  font-size: 1.08rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .nav__sheet-link:hover {
@@ -336,7 +397,12 @@ watch(() => [route.path, route.hash], () => {
   }
 
   .brand {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
+  }
+
+  .brand__mark {
+    width: 34px;
+    height: 34px;
   }
 
   .nav__sheet {
