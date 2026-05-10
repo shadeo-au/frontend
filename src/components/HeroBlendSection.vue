@@ -95,31 +95,31 @@ withDefaults(
 .hero-blend__copy {
   position: relative;
   z-index: 2;
-  width: min(45vw, 610px);
+  width: min(47vw, 660px);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 30px;
   will-change: transform, opacity;
   animation: hb-copy-in 0.88s cubic-bezier(0.16, 0.84, 0.44, 1) 0.32s both;
 }
 
 .hero-blend :slotted(h1) {
-  max-width: 10.5ch;
+  max-width: 12.5ch;
   color: var(--brand-ink);
-  font-family: var(--font-body);
-  font-size: var(--brand-fs-hero);
-  font-weight: 950;
-  line-height: 1;
+  font-family: var(--font-editorial);
+  font-size: clamp(3.15rem, 5.2vw, 5.85rem);
+  font-weight: 500;
+  line-height: 1.02;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
 .hero-blend :slotted(p) {
-  max-width: 38ch;
+  max-width: 42ch;
   color: var(--brand-ink-muted);
-  font-size: var(--brand-fs-lead);
-  font-weight: 650;
-  line-height: var(--brand-lh-copy);
+  font-size: clamp(1.08rem, 1.16vw, 1.22rem);
+  font-weight: 500;
+  line-height: 1.72;
 }
 
 /* ── Animations ─────────────────────────────────────────────── */

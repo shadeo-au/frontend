@@ -157,7 +157,11 @@ onBeforeUnmount(() => {
         id="hero"
         image-src="/herosection.png"
       >
-        <h1>Helping seniors stay cool outdoors.</h1>
+        <h1>
+          Helping seniors
+          <span class="home-script">stay cool</span>
+          outdoors.
+        </h1>
         <p>
           Shadeo helps older adults and carers understand heat risk, find cooler places,
           and make safer walking decisions before the day gets too hot.
@@ -166,7 +170,11 @@ onBeforeUnmount(() => {
 
       <section id="intro" class="why-overview" >
         <SectionKicker>The problem we address</SectionKicker>
-        <h2>Hot days can make daily life harder.</h2>
+        <h2>
+          Hot days can make
+          <span class="home-script home-script--inline">daily life</span>
+          harder.
+        </h2>
         <div class="why-overview__intro">
           <p>
             Shadeo helps older adults find cooler ways to go out, understand local heat,
@@ -201,7 +209,10 @@ onBeforeUnmount(() => {
       <PageSection id="navigation" tone="lime" side-label="Section 02 - Walk Planner">
         <template #copy>
           <SectionKicker>Cool routes for daily needs</SectionKicker>
-          <h2>Find a nearby place, then choose the safer walk.</h2>
+          <h2>
+            Find a nearby place, then choose the
+            <span class="home-script home-script--inline">safer walk</span>.
+          </h2>
           <p>
             Pick a daily type such as groceries, cafe, library, or pharmacy. Shadeo can
             suggest up to five nearby destinations, compare short routes, and score each
@@ -222,7 +233,11 @@ onBeforeUnmount(() => {
       <PageSection id="awareness" tone="warm" side-label="Section 03 - Awareness">
         <template #copy>
           <SectionKicker>Heat Vulnerability Index</SectionKicker>
-          <h2>Show where hot days may be harder.</h2>
+          <h2>
+            Show where
+            <span class="home-script home-script--inline">hot days</span>
+            may be harder.
+          </h2>
           <p>
             Shadeo visualises where high heat, fewer trees, fewer cooling facilities,
             older residents, and limited support may overlap. It helps people see who may
@@ -243,7 +258,11 @@ onBeforeUnmount(() => {
       <PageSection id="self-check" tone="lime" side-label="Section 04 - Self-check">
         <template #copy>
           <SectionKicker>Heat vulnerability self-check</SectionKicker>
-          <h2>A short check for heat risk and support.</h2>
+          <h2>
+            A
+            <span class="home-script home-script--inline">short check</span>
+            for heat risk and support.
+          </h2>
           <p>
             The self-check looks at personal sensitivity, local exposure, home cooling,
             mobility, and whether someone can check in. The result stays non-medical and
@@ -291,7 +310,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 24px;
+  gap: clamp(28px, 4vw, 46px);
   padding: calc(var(--nav-h) + 54px) max(var(--gutter), calc((100vw - 1180px) / 2)) 58px;
   background:
     radial-gradient(circle at 78% 24%, rgba(155, 224, 111, 0.1), transparent 32%),
@@ -319,48 +338,66 @@ onBeforeUnmount(() => {
 }
 
 .why-overview h2 {
-  max-width: 15ch;
+  max-width: 16ch;
   color: var(--brand-ink);
-  font-family: var(--font-body);
-  font-size: var(--brand-fs-h2);
-  font-weight: 950;
-  line-height: var(--brand-lh-heading);
+  font-family: var(--font-editorial);
+  font-size: clamp(2.55rem, 4.35vw, 4.75rem);
+  font-weight: 500;
+  line-height: 1.06;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
+.home-script {
+  display: block;
+  color: var(--shade-deep);
+  font-family: var(--font-script);
+  font-size: 1.18em;
+  font-weight: 700;
+  line-height: 0.76;
+  letter-spacing: 0;
+  transform: rotate(-1.5deg);
+  transform-origin: left center;
+}
+
+.home-script--inline {
+  display: inline-block;
+  margin-inline: 0.08em;
+  vertical-align: -0.04em;
+}
+
 .why-overview__intro {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 28px;
+  grid-template-columns: minmax(0, 0.86fr) auto;
+  align-items: end;
+  gap: clamp(30px, 6vw, 76px);
   max-width: 1040px;
 }
 
 .why-overview__intro p {
-  max-width: 54ch;
+  max-width: 48ch;
   color: var(--brand-ink-muted);
-  font-size: var(--brand-fs-lead);
-  font-weight: 650;
-  line-height: var(--brand-lh-copy);
+  font-size: clamp(1.08rem, 1.12vw, 1.2rem);
+  font-weight: 500;
+  line-height: 1.72;
 }
 
 .why-overview__grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 8px;
+  gap: clamp(18px, 2vw, 24px);
+  margin-top: 4px;
 }
 
 .why-card {
-  min-height: 210px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 24px;
-  border-radius: 28px;
+  gap: 16px;
+  padding: clamp(24px, 2.4vw, 32px);
+  border-radius: 24px;
   border: 1px solid var(--brand-line-soft);
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.66);
 }
 
 .why-card span {
@@ -373,14 +410,16 @@ onBeforeUnmount(() => {
 
 .why-card strong {
   color: var(--brand-ink-soft);
-  font-size: clamp(1.3rem, 1.5vw, 1.55rem);
-  line-height: 1.16;
+  font-size: clamp(1.22rem, 1.35vw, 1.48rem);
+  font-weight: 850;
+  line-height: 1.18;
 }
 
 .why-card small {
   color: var(--brand-ink-muted);
-  font-size: var(--brand-fs-body);
-  line-height: 1.45;
+  font-size: clamp(1rem, 1vw, 1.08rem);
+  font-weight: 500;
+  line-height: 1.58;
 }
 
 .number-card {

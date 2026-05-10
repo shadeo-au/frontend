@@ -91,7 +91,7 @@ withDefaults(
   max-width: 560px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 28px;
   z-index: 2;
 }
 
@@ -101,22 +101,22 @@ withDefaults(
 }
 
 .page-section :slotted(h2) {
-  max-width: 12.5ch;
+  max-width: 14ch;
   color: var(--brand-ink);
-  font-family: var(--font-body);
-  font-size: var(--brand-fs-h2);
-  font-weight: 950;
-  line-height: var(--brand-lh-heading);
+  font-family: var(--font-editorial);
+  font-size: clamp(2.45rem, 4vw, 4.45rem);
+  font-weight: 500;
+  line-height: 1.07;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
 .page-section :slotted(p) {
-  max-width: var(--brand-copy-width);
+  max-width: 46ch;
   color: var(--brand-ink-muted);
-  font-size: var(--brand-fs-lead);
-  font-weight: 650;
-  line-height: var(--brand-lh-copy);
+  font-size: clamp(1.08rem, 1.12vw, 1.2rem);
+  font-weight: 500;
+  line-height: 1.72;
 }
 
 .page-section :slotted(.section-actions) {
