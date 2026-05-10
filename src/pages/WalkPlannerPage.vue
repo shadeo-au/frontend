@@ -104,7 +104,7 @@
           <span>2</span>
           <div>
             <h2>Destination</h2>
-            <p>First choose whether you already know the place, or want Shadeo to suggest by category.</p>
+            
           </div>
         </div>
 
@@ -129,7 +129,7 @@
               @click="chooseDestinationType(item.id)"
             >
               <span class="planner-type-icon" aria-hidden="true">
-                <img :src="item.icon" alt="" />
+                <Icon :icon="item.iconName" />
               </span>
               <span class="planner-type-name">{{ item.label }}</span>
             </button>
@@ -172,9 +172,6 @@
           </p>
         </div>
 
-        <p v-if="destinationReadyLabel" class="planner-selection-note">
-          Destination choice: <strong>{{ destinationReadyLabel }}</strong>
-        </p>
         <p v-if="destinationValidationMessage" class="planner-selection-note planner-selection-note-error">
           {{ destinationValidationMessage }}
         </p>
@@ -615,12 +612,17 @@ const plannerSteps = [
   { id: 4, label: 'Route' }
 ]
 
+// Each destination type has both `icon` (legacy SVG URL, used for map markers
+// and route-detail thumbnails) and `iconName` (Iconify Material Symbols, used
+// in the type-selector cards and recommendation cards). The Iconify names
+// match the POI_CATEGORY_DISPLAY map so cards and search results look
+// consistent throughout the app.
 const destinationTypes = [
-  { id: 'pharmacy', label: 'Pharmacy', icon: pharmacyIcon },
-  { id: 'clinic', label: 'Clinic', icon: clinicIcon },
-  { id: 'grocery', label: 'Grocery', icon: groceryIcon },
-  { id: 'cafe', label: 'Cafe', icon: cafeIcon },
-  { id: 'park', label: 'Park', icon: parkIcon }
+  { id: 'pharmacy', label: 'Pharmacy', icon: pharmacyIcon, iconName: 'material-symbols:local-pharmacy' },
+  { id: 'clinic',   label: 'Clinic',   icon: clinicIcon,   iconName: 'material-symbols:medical-services' },
+  { id: 'grocery',  label: 'Grocery',  icon: groceryIcon,  iconName: 'material-symbols:shopping-cart' },
+  { id: 'cafe',     label: 'Cafe',     icon: cafeIcon,     iconName: 'material-symbols:local-cafe' },
+  { id: 'park',     label: 'Park',     icon: parkIcon,     iconName: 'material-symbols:park' }
 ]
 
 const essentialItems = [
@@ -2768,6 +2770,12 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   background: rgba(168, 212, 226, 0.28);
+}
+
+.planner-type-icon svg {
+  width: 32px;
+  height: 32px;
+  color: rgb(70, 100, 130);
 }
 
 .planner-choice-icon img,
