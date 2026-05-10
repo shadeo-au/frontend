@@ -1,38 +1,39 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { ComponentPublicInstance } from 'vue';
 import { useRoute } from 'vue-router';
-import AppButton from './AppButton.vue';
+
+type NavLink = {
+  label: string;
+  href: string;
+  path: string;
+  hash?: string;
+};
 
 const route = useRoute();
 const scrolled = ref(false);
 const open = ref(false);
+const hoveredHref = ref<string | null>(null);
+const linkRefs = ref<Record<string, HTMLElement | null>>({});
+const activeStyle = ref({ width: '0px', transform: 'translateX(0px)', opacity: 0 });
+const hoverStyle = ref({ width: '0px', transform: 'translateX(0px)', opacity: 0 });
 
-const onScroll = () => {
-  scrolled.value = window.scrollY > 18;
-};
-
-onMounted(() => {
-  onScroll();
-  window.addEventListener('scroll', onScroll, { passive: true });
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('scroll', onScroll);
-});
-
-const links = [
-  { label: 'Home', href: '/#hero', path: '/', hash: '#hero' },
+const links: NavLink[] = [
   { label: 'Why', href: '/why', path: '/why' },
   { label: 'Walk Planner', href: '/walk-planner', path: '/walk-planner' },
   { label: 'Awareness Map', href: '/awareness', path: '/awareness' },
   { label: 'Self-Check', href: '/self-check', path: '/self-check' },
 ];
 
+const onScroll = () => {
+  scrolled.value = window.scrollY > 18;
+};
+
 const closeMenu = () => {
   open.value = false;
 };
 
-const isActive = (link: { path: string; hash?: string }) => {
+const isActive = (link: NavLink) => {
   if (route.path !== link.path) return false;
   if (
     link.path === '/why' ||
@@ -43,6 +44,65 @@ const isActive = (link: { path: string; hash?: string }) => {
   if (!link.hash) return route.hash === '';
   return route.hash === link.hash || (link.hash === '#hero' && route.hash === '');
 };
+
+const activeLink = computed(() => links.find((link) => isActive(link)) ?? null);
+
+const setLinkRef = (href: string, el: Element | ComponentPublicInstance | null) => {
+  linkRefs.value[href] = el instanceof HTMLElement ? el : null;
+};
+
+const setIndicator = (
+  href: string | null,
+  target: typeof activeStyle.value
+) => {
+  if (!href) {
+    target.opacity = 0;
+    return;
+  }
+
+  const linkEl = linkRefs.value[href];
+  const navEl = linkEl?.parentElement;
+  if (!linkEl || !navEl) return;
+
+  const linkRect = linkEl.getBoundingClientRect();
+  const navRect = navEl.getBoundingClientRect();
+  target.width = `${linkRect.width}px`;
+  target.transform = `translateX(${linkRect.left - navRect.left}px)`;
+  target.opacity = 1;
+};
+
+const syncIndicators = async () => {
+  await nextTick();
+  setIndicator(activeLink.value?.href ?? null, activeStyle.value);
+  setIndicator(hoveredHref.value, hoverStyle.value);
+};
+
+const onLinkEnter = (href: string) => {
+  hoveredHref.value = href;
+  void syncIndicators();
+};
+
+const onLinkLeave = () => {
+  hoveredHref.value = null;
+  hoverStyle.value.opacity = 0;
+};
+
+onMounted(() => {
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', syncIndicators);
+  void syncIndicators();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll);
+  window.removeEventListener('resize', syncIndicators);
+});
+
+watch(() => [route.path, route.hash], () => {
+  closeMenu();
+  void syncIndicators();
+});
 </script>
 
 <template>
@@ -50,12 +110,19 @@ const isActive = (link: { path: string; hash?: string }) => {
     <div class="nav__inner">
       <a href="/#hero" class="brand" aria-label="Shadeo home" @click="closeMenu">Shadeo</a>
 
-      <nav class="nav__links" aria-label="Primary">
+      <nav class="nav__links" aria-label="Primary" @mouseleave="onLinkLeave">
+        <span class="nav__hover-bg" :style="hoverStyle" aria-hidden="true" />
+        <span class="nav__active-line" :style="activeStyle" aria-hidden="true" />
+        <span class="nav__hover-line" :style="hoverStyle" aria-hidden="true" />
         <a
           v-for="link in links"
           :key="link.href"
+          :ref="(el) => setLinkRef(link.href, el)"
           :href="link.href"
           :class="['nav__link', { 'is-active': isActive(link) }]"
+          @mouseenter="onLinkEnter(link.href)"
+          @focus="onLinkEnter(link.href)"
+          @blur="onLinkLeave"
         >
           {{ link.label }}
         </a>
@@ -90,35 +157,30 @@ const isActive = (link: { path: string; hash?: string }) => {
 <style scoped>
 .nav {
   position: fixed;
-  inset: 24px 0 auto;
+  inset: 0 0 auto;
   z-index: var(--z-nav);
-  pointer-events: none;
+  background: var(--brand-paper-white);
+  border-bottom: 1px solid transparent;
+  transition:
+    background-color var(--d-base) var(--ease-out-expo),
+    border-color var(--d-base) var(--ease-out-expo),
+    box-shadow var(--d-base) var(--ease-out-expo);
+}
+
+.nav--scrolled {
+  background: var(--brand-paper-white);
+  border-bottom-color: var(--brand-line-soft);
+  box-shadow: 0 14px 34px -28px rgba(35, 45, 39, 0.42);
 }
 
 .nav__inner {
   width: min(100% - var(--gutter) * 2, 1120px);
-  min-height: 68px;
+  min-height: var(--nav-h);
   margin-inline: auto;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: clamp(18px, 3vw, 32px);
-  padding: 10px 16px 10px 28px;
-  border-radius: 20px;
-  background: rgba(252, 247, 235, 0.88);
-  border: 1px solid var(--brand-line);
-  box-shadow: var(--brand-shadow-nav);
-  backdrop-filter: blur(16px) saturate(130%);
-  -webkit-backdrop-filter: blur(16px) saturate(130%);
-  pointer-events: auto;
-  transition:
-    transform var(--d-base) var(--ease-out-expo),
-    background-color var(--d-base) var(--ease-out-expo);
-}
-
-.nav--scrolled .nav__inner {
-  transform: translateY(-6px);
-  background: rgba(252, 247, 235, 0.96);
 }
 
 .brand {
@@ -130,45 +192,61 @@ const isActive = (link: { path: string; hash?: string }) => {
 }
 
 .nav__links {
+  position: relative;
   justify-self: center;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
 }
 
 .nav__link {
+  position: relative;
+  z-index: 1;
   min-height: var(--brand-touch);
   display: inline-flex;
   align-items: center;
-  padding: 0 16px;
-  border-radius: var(--r-pill);
+  justify-content: center;
+  padding: 0 18px;
   color: var(--brand-ink-muted);
+  font-size: 0.98rem;
   font-weight: 700;
-  font-size: 1rem;
-  transition:
-    color var(--d-fast) ease,
-    background-color var(--d-fast) ease;
+  white-space: nowrap;
+  transition: color var(--d-fast) ease;
 }
 
 .nav__link:hover,
 .nav__link.is-active {
   color: #23342a;
-  background: rgba(155, 224, 111, 0.24);
 }
 
-.nav__cta {
-  justify-self: end;
+.nav__hover-bg,
+.nav__active-line,
+.nav__hover-line {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+  transition:
+    transform 260ms var(--ease-out-expo),
+    width 260ms var(--ease-out-expo),
+    opacity var(--d-fast) ease;
 }
 
-.nav :deep(.btn) {
-  --btn-bg: #9be06f;
-  --btn-fg: #142016;
-  --btn-border: transparent;
-  box-shadow: none;
+.nav__hover-bg {
+  inset-block: 8px;
+  border-radius: 6px;
+  background: rgba(155, 224, 111, 0.09);
 }
 
-.nav :deep(.btn:hover) {
-  --btn-bg: var(--brand-lime-hover);
+.nav__active-line,
+.nav__hover-line {
+  bottom: 7px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(139, 202, 93, 0.72);
+}
+
+.nav__hover-line {
+  background: rgba(98, 133, 107, 0.38);
 }
 
 .nav__burger {
@@ -192,15 +270,15 @@ const isActive = (link: { path: string; hash?: string }) => {
 
 .nav__sheet {
   position: fixed;
-  inset: 110px var(--gutter) auto;
+  inset: calc(var(--nav-h) + 10px) var(--gutter) auto;
   display: none;
   flex-direction: column;
   gap: 10px;
   padding: 18px;
-  border-radius: 22px;
-  background: rgba(252, 247, 235, 0.96);
+  border-radius: 18px;
+  background: rgba(252, 247, 235, 0.98);
   border: 1px solid var(--brand-line);
-  box-shadow: 0 24px 60px -36px rgba(35, 45, 39, 0.38);
+  box-shadow: 0 18px 42px -34px rgba(35, 45, 39, 0.38);
   pointer-events: none;
   opacity: 0;
   transform: translateY(-8px);
@@ -220,7 +298,7 @@ const isActive = (link: { path: string; hash?: string }) => {
   display: flex;
   align-items: center;
   padding: 13px 16px;
-  border-radius: 16px;
+  border-radius: 8px;
   color: var(--brand-ink-muted);
   font-size: 1.125rem;
   font-weight: 800;
@@ -228,7 +306,7 @@ const isActive = (link: { path: string; hash?: string }) => {
 
 .nav__sheet-link:hover {
   color: var(--brand-ink-soft);
-  background: rgba(155, 224, 111, 0.22);
+  background: rgba(155, 224, 111, 0.18);
 }
 
 .nav__sheet-link.is-active {
@@ -237,8 +315,7 @@ const isActive = (link: { path: string; hash?: string }) => {
 }
 
 @media (max-width: 980px) {
-  .nav__links,
-  .nav__cta {
+  .nav__links {
     display: none;
   }
 
@@ -254,14 +331,8 @@ const isActive = (link: { path: string; hash?: string }) => {
 }
 
 @media (max-width: 640px) {
-  .nav {
-    inset-block-start: 14px;
-  }
-
   .nav__inner {
     min-height: 64px;
-    padding: 8px 12px 8px 18px;
-    border-radius: 18px;
   }
 
   .brand {
@@ -269,7 +340,7 @@ const isActive = (link: { path: string; hash?: string }) => {
   }
 
   .nav__sheet {
-    inset-block-start: 88px;
+    inset-block-start: 74px;
   }
 }
 </style>
