@@ -212,24 +212,47 @@
               <h3>Compare nearby options</h3>
               <span>Select an option to preview its details.</span>
             </div>
+            <div class="planner-result-toolbar">
+              <label>
+                Sort by
+                <select v-model="recommendationSort">
+                  <option value="score-desc">Highest score</option>
+                  <option value="distance-asc">Shortest distance</option>
+                  <option value="shade-desc">Most shade</option>
+                </select>
+              </label>
+            </div>
             <article
-              v-for="(item, index) in recommendations"
+              v-for="(item, index) in visibleRecommendations"
               :key="item.id"
               class="planner-destination-card"
-              :class="{ 'is-top-result': index === 0, 'is-selected': highlightedRecommendationId === item.id }"
+              :class="{ 'is-top-result': isMostRecommended(item), 'is-selected': highlightedRecommendationId === item.id }"
               @click="highlightRecommendation(item)"
             >
               <span class="planner-destination-rank">{{ index + 1 }}</span>
               <span class="planner-destination-body">
                 <span class="planner-destination-topline">
-                  <span v-if="index === 0" class="planner-rec-label">Most Recommended</span>
-                  <span class="planner-score-badge" :class="scoreTone(item.score)">
-                    <span aria-hidden="true">Score</span>
-                    {{ formatScore(item.score) }}
+                  <span
+                    v-for="badge in recommendationBadges(item)"
+                    :key="badge.label"
+                    class="planner-rec-label"
+                    :class="badge.tone"
+                  >
+                    <Icon :icon="badge.icon" aria-hidden="true" />
+                    {{ badge.label }}
                   </span>
                 </span>
-                <strong>{{ item.destination.name }}</strong>
-                <small class="planner-destination-address">{{ item.destination.address }}</small>
+                <span class="planner-destination-main">
+                  <strong>{{ item.destination.name }}</strong>
+                  <small class="planner-destination-address">{{ item.destination.address }}</small>
+                </span>
+                <span class="planner-card-score">
+                  <span>Route score</span>
+                  <span class="planner-score-badge planner-score-badge-large" :class="scoreTone(item.score)">
+                    <strong>{{ formatCompactScore(item.score) }}</strong>
+                    <small>{{ item.ratingLabel || ratingLabelFromScore(item.score) }}</small>
+                  </span>
+                </span>
                 <span class="planner-destination-metrics">
                   <span>
                     <img :src="timeIcon" alt="" aria-hidden="true" />
@@ -240,8 +263,16 @@
                     {{ formatDistance(item.metrics.distanceMeters) }}
                   </span>
                 </span>
-                <span v-if="recommendationSummaryNotes(item).length" class="planner-tag-row">
-                  <em v-for="note in recommendationSummaryNotes(item)" :key="note">{{ note }}</em>
+                <span v-if="recommendationFeatureChips(item).length" class="planner-tag-row planner-feature-chip-row">
+                  <em
+                    v-for="chip in recommendationFeatureChips(item)"
+                    :key="chip.key"
+                    :class="chip.tone"
+                  >
+                    <img v-if="chip.iconSrc" :src="chip.iconSrc" alt="" aria-hidden="true" />
+                    <Icon v-else :icon="chip.icon" aria-hidden="true" />
+                    {{ chip.label }}
+                  </em>
                 </span>
                 <button
                   v-if="highlightedRecommendationId === item.id"
@@ -309,14 +340,33 @@
             <small>tree shade</small>
           </span>
         </div>
-        <div class="planner-detail-info-list">
-          <div>
-            <strong>Address</strong>
-            <span>{{ detailRecommendation.destination.address || '' }}</span>
+        <section v-if="hasDetailScore" class="planner-detail-rating" :class="scoreTone(detailRecommendation.score)">
+          <div class="planner-detail-rating-head">
+            <div>
+              <span>Route rating</span>
+              <strong>{{ detailRatingLabel }}</strong>
+            </div>
+            <em>{{ formatScore(detailRecommendation.score) }}</em>
           </div>
-          <div>
-            <strong>Opening hours</strong>
-            <span>{{ detailRecommendation.destination.openingHours || '' }}</span>
+          <p v-if="detailRecommendation.ratingReason">{{ detailRecommendation.ratingReason }}</p>
+          <div class="planner-score-breakdown">
+            <div v-for="row in detailScoreBreakdownRows" :key="row.key" class="planner-score-row">
+              <div class="planner-score-row-top">
+                <span>{{ row.label }}</span>
+                <strong>{{ row.displayValue }}</strong>
+              </div>
+              <div class="planner-score-bar" aria-hidden="true">
+                <span :style="{ width: `${row.percent}%` }"></span>
+              </div>
+              <small>{{ row.meta }}</small>
+            </div>
+          </div>
+        </section>
+        <div class="planner-detail-info-list">
+          <div v-for="row in detailInfoRows" :key="row.key">
+            <strong>{{ row.label }}</strong>
+            <a v-if="row.href" :href="row.href" target="_blank" rel="noreferrer">{{ row.value }}</a>
+            <span v-else>{{ row.value }}</span>
           </div>
           <div v-if="hasDetailFacilities">
             <strong>Along the way</strong>
@@ -706,6 +756,7 @@ const startOutOfAreaCount = ref(0)
 const destinationOutOfAreaCount = ref(0)
 const recommendations = ref([])
 const highlightedRecommendationId = ref('')
+const recommendationSort = ref('score-desc')
 const isSearchingStart = ref(false)
 const isSearchingDestination = ref(false)
 const isLoadingPlan = ref(false)
@@ -735,6 +786,9 @@ const result = reactive({
   route: [],
   metrics: { distanceMeters: null, durationMinutes: null },
   score: null,
+  routeRating: null,
+  ratingLabel: '',
+  ratingReason: '',
   scoreBreakdown: {},
   facilitySummary: {},
   canopy: null,
@@ -760,6 +814,28 @@ const routeMapMarkers = []
 const hasDestination = computed(() => !!result.destination)
 const selectedRecommendation = computed(() => recommendations.value.find((item) => item.id === highlightedRecommendationId.value) || null)
 const detailRecommendation = computed(() => selectedRecommendation.value)
+const visibleRecommendations = computed(() => {
+  const items = [...recommendations.value]
+  const valueFor = (item, key) => {
+    if (key === 'score') return Number(item.score)
+    if (key === 'distance') return Number(item.metrics?.distanceMeters)
+    if (key === 'shade') return Number(item.metrics?.shadeCoverage)
+    if (key === 'time') return Number(item.metrics?.durationMinutes)
+    return Number.NaN
+  }
+
+  const finite = (value, fallback) => Number.isFinite(value) ? value : fallback
+
+  if (recommendationSort.value === 'distance-asc') {
+    return items.sort((a, b) => finite(valueFor(a, 'distance'), Infinity) - finite(valueFor(b, 'distance'), Infinity))
+  }
+  if (recommendationSort.value === 'shade-desc') {
+    return items.sort((a, b) => finite(valueFor(b, 'shade'), -Infinity) - finite(valueFor(a, 'shade'), -Infinity))
+  }
+  return items.sort((a, b) => finite(valueFor(b, 'score'), -Infinity) - finite(valueFor(a, 'score'), -Infinity))
+})
+const topRecommendationScore = computed(() => Math.max(...recommendations.value.map((item) => Number(item.score)).filter(Number.isFinite), -Infinity))
+const topShadeCoverage = computed(() => Math.max(...recommendations.value.map((item) => Number(item.metrics?.shadeCoverage)).filter(Number.isFinite), -Infinity))
 const destinationKind = computed(() => selectedType.value || result.destination?.type || selectedSpecificDestination.value?.type || '')
 const selectedTypeLabel = computed(() => destinationTypes.find((d) => d.id === selectedType.value)?.label || selectedSpecificDestination.value?.type || 'Destination')
 const selectedTypeIconUrl = computed(() => destinationTypes.find((d) => d.id === selectedType.value || d.id === selectedSpecificDestination.value?.type)?.icon || parkIcon)
@@ -802,15 +878,75 @@ const detailFacilitySummaryText = computed(() => {
   return names.length ? `You may pass ${names.join(', ')}.` : ''
 })
 const hasDetailFacilities = computed(() => Object.values(detailFacilityBreakdown.value).some((value) => value > 0))
+const hasDetailScore = computed(() => Number.isFinite(Number(detailRecommendation.value?.score)))
+const detailRatingLabel = computed(() => detailRecommendation.value?.ratingLabel || ratingLabelFromScore(detailRecommendation.value?.score))
+const detailScoreBreakdownRows = computed(() => {
+  const recommendation = detailRecommendation.value
+  const breakdown = recommendation?.scoreBreakdown || {}
+  const weights = breakdown.weights || {}
+  const rows = [
+    {
+      key: 'shade',
+      label: 'Shade',
+      value: Number(breakdown.shade),
+      max: Number(weights.shade ?? 45),
+      meta: Number.isFinite(Number(breakdown.shadeCoverage))
+        ? `${Math.round(Number(breakdown.shadeCoverage) * 100)}% tree shade coverage`
+        : 'Tree shade contribution'
+    },
+    {
+      key: 'facilities',
+      label: 'Facilities',
+      value: Number(breakdown.facilities),
+      max: Number(weights.facilities ?? 30),
+      meta: facilityCountText(breakdown)
+    },
+    {
+      key: 'distance',
+      label: 'Distance',
+      value: Number(breakdown.distance),
+      max: Number(weights.distance ?? 25),
+      meta: Number.isFinite(Number(breakdown.distanceMeters))
+        ? `${formatDistance(Number(breakdown.distanceMeters))} walking route`
+        : 'Shorter routes score higher'
+    }
+  ]
+
+  return rows.map((row) => {
+    const value = Number.isFinite(row.value) ? row.value : 0
+    const max = Number.isFinite(row.max) && row.max > 0 ? row.max : 1
+    return {
+      ...row,
+      displayValue: `${formatScorePart(value)} / ${formatScorePart(max)}`,
+      percent: Math.max(0, Math.min(100, Math.round((value / max) * 100)))
+    }
+  })
+})
+const websiteHref = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  return /^https?:\/\//i.test(text) ? text : `https://${text}`
+}
+const detailInfoRows = computed(() => {
+  const destination = detailRecommendation.value?.destination || {}
+  return [
+    { key: 'address', label: 'Address', value: destination.address || '' },
+    { key: 'opening-hours', label: 'Opening hours', value: destination.openingHours || '' },
+    { key: 'website', label: 'Website', value: destination.website || '', href: websiteHref(destination.website) },
+    { key: 'phone', label: 'Phone', value: destination.phone || '' },
+    { key: 'wheelchair', label: 'Wheelchair access', value: destination.wheelchair || '' },
+    { key: 'cuisine', label: 'Cuisine', value: destination.cuisine || '' },
+    { key: 'brand', label: 'Brand', value: destination.brand || '' },
+    { key: 'operator', label: 'Operator', value: destination.operator || '' },
+    { key: 'last-updated', label: 'Last updated', value: destination.lastUpdated || '' },
+  ].filter((row) => String(row.value || '').trim())
+})
 const hasAnyFacility = computed(() => Object.values(facilityBreakdown.value).some((value) => value > 0))
 const routeComfortNotes = computed(() => result.comfortNotes.length ? result.comfortNotes : readinessRouteAlerts.value)
 const scoreBreakdownRows = computed(() => [
-  { key: 'distance', label: 'Distance and time', value: result.scoreBreakdown.distance ?? '--' },
-  { key: 'bench', label: 'Bench coverage', value: result.scoreBreakdown.bench ?? '--' },
-  { key: 'toilet', label: 'Toilet coverage', value: result.scoreBreakdown.toilet ?? '--' },
-  { key: 'drinking_fountain', label: 'Water access', value: result.scoreBreakdown.drinking_fountain ?? '--' },
   { key: 'shade', label: 'Shade', value: result.scoreBreakdown.shade ?? '--' },
-  { key: 'slope', label: 'Slope comfort', value: result.scoreBreakdown.slope ?? '--' }
+  { key: 'facilities', label: 'Facilities', value: result.scoreBreakdown.facilities ?? '--' },
+  { key: 'distance', label: 'Distance', value: result.scoreBreakdown.distance ?? '--' }
 ])
 const destinationChecklist = computed(() => destinationChecklistByType[destinationKind.value] || destinationChecklistByType.default)
 const destinationChecklistIntro = computed(() => destinationChecklist.value.intro)
@@ -892,6 +1028,20 @@ const canSeeRoute = computed(() => {
 const showMapShoppingList = computed(() => destinationKind.value === 'grocery' && shoppingItems.value.length > 0)
 
 const formatScore = (score) => Number.isFinite(Number(score)) ? `${Math.round(Number(score))}/100` : 'Score --'
+const formatCompactScore = (score) => Number.isFinite(Number(score)) ? `${Math.round(Number(score))}` : '--'
+const formatScorePart = (value) => {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '--'
+  return Number.isInteger(number) ? `${number}` : number.toFixed(1)
+}
+const ratingLabelFromScore = (score) => {
+  const value = Number(score)
+  if (!Number.isFinite(value)) return 'Not rated'
+  if (value >= 80) return 'Excellent'
+  if (value >= 68) return 'Good'
+  if (value >= 55) return 'Fair'
+  return 'Challenging'
+}
 const scoreTone = (score) => {
   const value = Number(score)
   if (value >= 80) return 'score-high'
@@ -925,6 +1075,16 @@ const facilityTypeNames = (breakdown) => {
   if ((breakdown?.drinking_fountain || 0) > 0) names.push('drinking fountains')
   return names
 }
+const facilityCountText = (breakdown) => {
+  const parts = []
+  const benches = Number(breakdown?.bench || 0)
+  const toilets = Number(breakdown?.toilet || 0)
+  const fountains = Number(breakdown?.drinking_fountain || 0)
+  if (benches > 0) parts.push(`${benches} bench${benches === 1 ? '' : 'es'}`)
+  if (toilets > 0) parts.push(`${toilets} toilet${toilets === 1 ? '' : 's'}`)
+  if (fountains > 0) parts.push(`${fountains} fountain${fountains === 1 ? '' : 's'}`)
+  return parts.length ? parts.join(', ') : 'No nearby facilities counted'
+}
 const recommendationSummaryNotes = (recommendation) => {
   const notes = []
   const breakdown = facilityBreakdownForRecommendation(recommendation)
@@ -933,6 +1093,56 @@ const recommendationSummaryNotes = (recommendation) => {
   const shade = Number(recommendation?.metrics?.shadeCoverage)
   if (Number.isFinite(shade)) notes.push(`${Math.round(shade * 100)}% tree shade`)
   return notes
+}
+const isMostRecommended = (recommendation) => {
+  const score = Number(recommendation?.score)
+  return Number.isFinite(score) && Number.isFinite(topRecommendationScore.value) && score === topRecommendationScore.value
+}
+const isBestShade = (recommendation) => {
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  return Number.isFinite(shade) && shade >= 0.2 && Number.isFinite(topShadeCoverage.value) && shade === topShadeCoverage.value
+}
+const shadeTierLabel = (recommendation) => {
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  if (!Number.isFinite(shade)) return ''
+  if (shade >= 0.65) return 'Best shade'
+  if (shade >= 0.4) return 'Shaded route'
+  if (shade >= 0.2) return 'Some shade'
+  return 'Limited shade'
+}
+const recommendationBadges = (recommendation) => {
+  const badges = []
+  if (isMostRecommended(recommendation)) {
+    badges.push({ label: 'Most Recommended', icon: 'material-symbols:star-rounded', tone: 'planner-rec-label-gold' })
+  }
+  if (isBestShade(recommendation)) {
+    badges.push({ label: 'Best shade', icon: 'material-symbols:eco', tone: 'planner-rec-label-green' })
+  }
+  return badges
+}
+const recommendationFeatureChips = (recommendation) => {
+  const chips = []
+  const shadeLabel = shadeTierLabel(recommendation)
+  if (shadeLabel) {
+    chips.push({
+      key: 'shade',
+      label: shadeLabel,
+      icon: 'material-symbols:park',
+      tone: shadeLabel === 'Limited shade' ? 'planner-chip-warm' : 'planner-chip-shade'
+    })
+  }
+
+  const breakdown = facilityBreakdownForRecommendation(recommendation)
+  if (breakdown.bench > 0) {
+    chips.push({ key: 'bench', label: `${breakdown.bench} Bench${breakdown.bench === 1 ? '' : 'es'}`, iconSrc: benchIcon, tone: 'planner-chip-bench' })
+  }
+  if (breakdown.drinking_fountain > 0) {
+    chips.push({ key: 'drinking_fountain', label: `${breakdown.drinking_fountain} Fountain${breakdown.drinking_fountain === 1 ? '' : 's'}`, iconSrc: fountainIcon, tone: 'planner-chip-fountain' })
+  }
+  if (breakdown.toilet > 0) {
+    chips.push({ key: 'toilet', label: `${breakdown.toilet} Toilet${breakdown.toilet === 1 ? '' : 's'}`, iconSrc: toiletIcon, tone: 'planner-chip-toilet' })
+  }
+  return chips
 }
 const recommendationShadeLabel = (recommendation) => {
   const shade = Number(recommendation?.metrics?.shadeCoverage)
@@ -1136,6 +1346,15 @@ const FALLBACK_CATEGORY_DISPLAY = { icon: 'material-symbols:location-on', label:
 const categoryDisplay = (place) =>
   POI_CATEGORY_DISPLAY[place?.category] || FALLBACK_CATEGORY_DISPLAY
 
+const placeTagValue = (place, ...keys) => {
+  const tags = place?.tags && typeof place.tags === 'object' ? place.tags : {}
+  for (const key of keys) {
+    const value = place?.[key] ?? tags[key]
+    if (value !== undefined && value !== null && String(value).trim()) return String(value)
+  }
+  return ''
+}
+
 const normalisePlaceSearchResults = (payload) => Array.isArray(payload?.places)
   ? payload.places
     .map((place, index) => {
@@ -1150,6 +1369,14 @@ const normalisePlaceSearchResults = (payload) => Array.isArray(payload?.places)
         type: inferDestinationType(place),
         category: categories[0] || place.resultType || '',
         categories,
+        openingHours: placeTagValue(place, 'openingHours', 'opening_hours', 'hours'),
+        website: placeTagValue(place, 'website'),
+        phone: placeTagValue(place, 'phone'),
+        wheelchair: placeTagValue(place, 'wheelchair'),
+        cuisine: placeTagValue(place, 'cuisine'),
+        brand: placeTagValue(place, 'brand'),
+        operator: placeTagValue(place, 'operator'),
+        lastUpdated: placeTagValue(place, 'lastUpdated', 'last_updated', 'updatedAt', 'updated_at', 'timestamp'),
         lat,
         lng
       }
@@ -1217,8 +1444,15 @@ const normaliseBackendDestination = (destination, fallback = {}) => {
     placeId: destination?.placeId || fallback.placeId || null,
     name: destination?.name || fallback.name || 'Recommended destination',
     type,
-    address: destination?.address || destination?.vicinity || destination?.formatted || fallback.address || selectedTypeLabel.value,
+    address: destination?.address || destination?.vicinity || destination?.formatted || fallback.address || '',
     openingHours: destination?.openingHours || destination?.opening_hours || destination?.hours || fallback.openingHours || '',
+    website: destination?.website || fallback.website || '',
+    phone: destination?.phone || fallback.phone || '',
+    wheelchair: destination?.wheelchair || fallback.wheelchair || '',
+    cuisine: destination?.cuisine || fallback.cuisine || '',
+    brand: destination?.brand || fallback.brand || '',
+    operator: destination?.operator || fallback.operator || '',
+    lastUpdated: destination?.lastUpdated || destination?.last_updated || destination?.updatedAt || destination?.updated_at || fallback.lastUpdated || '',
     lat,
     lng
   }
@@ -1278,6 +1512,9 @@ const buildBackendRecommendation = (payload, index = 0) => {
       preferShade: Boolean(routeSummary.preferShade)
     },
     score: Number.isFinite(Number(payload.score)) ? Number(payload.score) : null,
+    routeRating: Number.isFinite(Number(payload.routeRating)) ? Number(payload.routeRating) : null,
+    ratingLabel: payload.ratingLabel || '',
+    ratingReason: payload.ratingReason || '',
     scoreBreakdown: payload.scoreBreakdown || {},
     comfortNotes: buildBackendComfortNotes(facilities, routeSummary),
     instructions: []
@@ -1494,6 +1731,9 @@ const clearPlanOnly = () => {
     route: [],
     metrics: { distanceMeters: null, durationMinutes: null },
     score: null,
+    routeRating: null,
+    ratingLabel: '',
+    ratingReason: '',
     scoreBreakdown: {},
     facilitySummary: {},
     canopy: null,
@@ -1539,7 +1779,7 @@ const requestPlan = async () => {
         planError.value = 'We could not find a suitable walking option for this start point and destination.'
       }
       recommendations.value = supportedRecommendations
-      highlightedRecommendationId.value = supportedRecommendations[0]?.id || ''
+      highlightedRecommendationId.value = visibleRecommendations.value[0]?.id || ''
     }
   } catch (error) {
     planError.value = friendlyServiceErrorMessage()
@@ -1592,6 +1832,9 @@ const applySelectedRecommendation = (recommendation) => {
     route: recommendation?.route || [],
     metrics: recommendation?.metrics || { distanceMeters: null, durationMinutes: null },
     score: recommendation?.score ?? null,
+    routeRating: recommendation?.routeRating ?? null,
+    ratingLabel: recommendation?.ratingLabel || '',
+    ratingReason: recommendation?.ratingReason || '',
     scoreBreakdown: recommendation?.scoreBreakdown || {},
     facilitySummary: recommendation?.facilitySummary || {},
     canopy: null,
@@ -1636,7 +1879,7 @@ const backToRecommendations = async () => {
 const highlightRecommendation = async (recommendation) => {
   highlightedRecommendationId.value = recommendation?.id || ''
   await nextTick()
-  drawMiniMap()
+  drawMiniMap({ focusSelected: true })
 }
 
 const loadBoundaryGeoJson = async () => {
@@ -2152,13 +2395,30 @@ const drawCanopyLayer = (targetMap, sourceId) => {
     console.error('[Shadeo draw canopy failed]', error)
   }
 }
-const fitMapToPoints = (targetMap, lngLatPoints, padding) => {
+const fitMapToPoints = (targetMap, lngLatPoints, padding, maxZoom = MAP_MAX_ZOOM) => {
   if (!targetMap || !lngLatPoints.length) return
   const bounds = lngLatPoints.reduce(
     (mapBounds, point) => mapBounds.extend(point),
     new maplibregl.LngLatBounds(lngLatPoints[0], lngLatPoints[0])
   )
-  targetMap.fitBounds(bounds, { padding, maxZoom: MAP_MAX_ZOOM, duration: 0 })
+  targetMap.fitBounds(bounds, { padding, maxZoom, duration: 0 })
+}
+const maxCoordinateSpan = (lngLatPoints) => {
+  if (!lngLatPoints.length) return 0
+  const lngs = lngLatPoints.map((point) => Number(point[0])).filter(Number.isFinite)
+  const lats = lngLatPoints.map((point) => Number(point[1])).filter(Number.isFinite)
+  if (!lngs.length || !lats.length) return 0
+  return Math.max(
+    Math.max(...lngs) - Math.min(...lngs),
+    Math.max(...lats) - Math.min(...lats)
+  )
+}
+const miniMapFitMaxZoom = (lngLatPoints) => {
+  const span = maxCoordinateSpan(lngLatPoints)
+  if (span <= 0.003) return 15.9
+  if (span <= 0.006) return 15.5
+  if (span <= 0.012) return 15
+  return 14.2
 }
 const drawRouteLine = (targetMap, sourceId, lngLatLine) => {
   if (DEBUG_PLANNER && sourceId === 'planner-route') {
@@ -2227,8 +2487,8 @@ const drawMarkerSet = (targetMap, markers, lngLatBounds, includeFacilities = fal
   )
   lngLatBounds.push([start.lng, start.lat])
 
-  const destinations = (targetMap === miniMap && recommendations.value.length
-    ? recommendations.value
+  const destinations = (targetMap === miniMap && visibleRecommendations.value.length
+    ? visibleRecommendations.value
     : hasDestination.value ? [result] : recommendations.value)
     .map((item, index) => ({ item, index }))
   const orderedDestinations = [
@@ -2266,21 +2526,28 @@ const ensureMiniMap = async () => {
   miniMap = await createPlannerMap(miniMapEl.value, { zoom: 13, onLoad: drawMiniMap })
   miniMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 }
-const drawMiniMap = async () => {
+const drawMiniMap = async (options = {}) => {
   if (!recommendations.value.length && !hasDestination.value) return
   await ensureMiniMap()
   if (!miniMap?.isStyleLoaded()) return
+  const focusSelected = options?.focusSelected === true
   const lngLatBounds = []
   drawMarkerSet(miniMap, miniMapMarkers, lngLatBounds, false)
   const focusedDestination = selectedRecommendation.value?.destination
-  if (focusedDestination && Number.isFinite(Number(focusedDestination.lng)) && Number.isFinite(Number(focusedDestination.lat))) {
+  if (focusSelected && focusedDestination && Number.isFinite(Number(focusedDestination.lng)) && Number.isFinite(Number(focusedDestination.lat))) {
     miniMap.easeTo({
       center: [focusedDestination.lng, focusedDestination.lat],
-      zoom: Math.min(MAP_MAX_ZOOM, 15.4),
+      zoom: Math.min(MAP_MAX_ZOOM, 16.8),
+      padding: { top: 0, bottom: 0, left: 0, right: 0 },
       duration: 260
     })
   } else {
-    fitMapToPoints(miniMap, lngLatBounds, 34)
+    fitMapToPoints(
+      miniMap,
+      lngLatBounds,
+      { top: 44, bottom: 58, left: 44, right: 44 },
+      miniMapFitMaxZoom(lngLatBounds)
+    )
   }
   requestAnimationFrame(() => miniMap?.resize())
 }
@@ -2430,6 +2697,10 @@ watch(hasDestination, async () => {
   await nextTick()
   drawMiniMap()
 })
+watch(recommendationSort, async () => {
+  await nextTick()
+  drawMiniMap()
+})
 watch(
   () => isReadinessOpen.value,
   async (open) => {
@@ -2499,9 +2770,9 @@ onBeforeUnmount(() => {
 .planner-step-nav {
   position: fixed;
   top: 50%;
-  right: clamp(16px, 2.8vw, 44px);
+  left: clamp(14px, 1.6vw, 28px);
   z-index: 40;
-  width: 190px;
+  width: 168px;
   margin: 0;
   transform: translateY(-50%);
   display: grid;
@@ -2577,8 +2848,8 @@ onBeforeUnmount(() => {
 
 @media (min-width: 1180px) {
   .planner-shell {
-    width: min(calc(100% - var(--gutter) * 2 - 230px), 1080px);
-    margin-left: max(var(--gutter), calc((100vw - 1320px) / 2));
+    width: min(calc(100% - 230px - var(--gutter)), 1280px);
+    margin-left: max(210px, calc((100vw - 1280px) / 2 + 80px));
     margin-right: auto;
   }
 }
@@ -3101,9 +3372,9 @@ onBeforeUnmount(() => {
 }
 
 .planner-recommendation-layout {
-  padding: clamp(18px, 3vw, 26px);
+  padding: clamp(18px, 2.4vw, 24px);
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+  grid-template-columns: minmax(430px, 0.95fr) minmax(440px, 1.05fr);
   gap: 18px;
   align-items: stretch;
 }
@@ -3118,14 +3389,42 @@ onBeforeUnmount(() => {
   font-size: clamp(1.75rem, 2.6vw, 2.4rem);
 }
 
+.planner-result-toolbar {
+  margin-bottom: 2px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.planner-result-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--brand-ink-soft);
+  font-size: 0.98rem;
+  font-weight: 1000;
+}
+
+.planner-result-toolbar select {
+  min-height: 38px;
+  border: 1px solid var(--brand-line-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--brand-ink-soft);
+  padding: 0 34px 0 12px;
+  font-weight: 900;
+}
+
 .planner-destination-card {
   cursor: pointer;
   align-items: flex-start;
+  padding: 14px 16px;
+  gap: 12px;
 }
 
 .planner-destination-card.is-top-result {
-  background: rgba(255, 255, 255, 0.64);
-  border-color: rgba(239, 166, 43, 0.28);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 224, 0.78));
+  border-color: rgba(239, 166, 43, 0.54);
+  box-shadow: 0 18px 42px -34px rgba(159, 100, 22, 0.7);
 }
 
 .planner-destination-rank {
@@ -3137,13 +3436,18 @@ onBeforeUnmount(() => {
   place-items: center;
   background: #263028;
   color: #fff;
+  font-size: 1rem;
   font-weight: 950;
 }
 
 .planner-destination-body {
+  flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 5px;
+  align-items: start;
 }
 
 .planner-destination-topline,
@@ -3159,20 +3463,39 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.planner-destination-topline {
+  grid-column: 1 / -1;
+}
+
 .planner-result-actions {
   margin-top: 10px;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .planner-result-actions .btn {
   min-width: 148px;
 }
 
+.planner-destination-main {
+  grid-column: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.planner-destination-main strong {
+  color: var(--brand-ink-soft);
+  font-size: clamp(1.18rem, 1.65vw, 1.52rem);
+  font-weight: 950;
+  line-height: 1.14;
+  overflow-wrap: anywhere;
+}
+
 .planner-rec-label,
 .planner-score-badge,
 .planner-tag-row em {
   border-radius: var(--r-pill);
-  padding: 7px 10px;
+  padding: 6px 10px;
   background: rgba(35, 45, 39, 0.08);
   color: var(--brand-ink-soft);
   font-size: 0.82rem;
@@ -3181,18 +3504,130 @@ onBeforeUnmount(() => {
   line-height: 1;
 }
 
+.planner-rec-label,
+.planner-tag-row em,
+.planner-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.planner-rec-label svg,
+.planner-tag-row em svg {
+  width: 16px;
+  height: 16px;
+}
+
+.planner-rec-label-gold {
+  background: linear-gradient(90deg, #fff1c8, #f5cf7c);
+  color: #6d4a13;
+}
+
+.planner-rec-label-green {
+  background: #e7f1df;
+  color: #3e6b3f;
+}
+
+.planner-card-score {
+  grid-column: 2;
+  grid-row: 2 / span 3;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+}
+
+.planner-destination-metrics,
+.planner-feature-chip-row {
+  grid-column: 1;
+}
+
+.planner-view-details {
+  grid-column: 1 / -1;
+}
+
+.planner-card-score > span:first-child {
+  width: 86px;
+  color: var(--brand-ink-soft);
+  font-size: 0.7rem;
+  font-weight: 1000;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.planner-score-badge-large {
+  width: 86px;
+  min-height: 58px;
+  align-self: start;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.planner-score-badge-large strong {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.planner-score-badge-large small {
+  color: inherit;
+  font-size: 0.76rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
 .planner-score-badge.score-high {
-  background: rgba(168, 212, 226, 0.38);
-  color: #254f5d;
+  background: rgba(153, 207, 149, 0.32);
+  color: #2e6337;
 }
 
 .planner-score-badge.score-medium {
-  background: var(--brand-gold);
+  background: rgba(239, 166, 43, 0.2);
+  color: #7a5718;
 }
 
 .planner-score-badge.score-low {
   background: rgba(215, 114, 82, 0.18);
   color: #7b3426;
+}
+
+.planner-feature-chip-row em {
+  min-height: 31px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.planner-feature-chip-row img {
+  width: 18px;
+  height: 18px;
+}
+
+.planner-chip-shade {
+  background: #e9f3e4;
+  color: #3f693c;
+}
+
+.planner-chip-warm {
+  background: rgba(239, 166, 43, 0.18);
+  color: #735018;
+}
+
+.planner-chip-bench {
+  background: #f2eddf;
+  color: #62512d;
+}
+
+.planner-chip-fountain {
+  background: #e4f3f6;
+  color: #2d6570;
+}
+
+.planner-chip-toilet {
+  background: #e7eef8;
+  color: #345c83;
 }
 
 .planner-destination-metrics span,
@@ -3280,6 +3715,134 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
+.planner-destination-metrics {
+  margin-top: 0;
+}
+
+.planner-feature-chip-row {
+  margin-top: -1px;
+}
+
+.planner-detail-rating {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--brand-line-soft);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+  display: grid;
+  gap: 14px;
+}
+
+.planner-detail-rating-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.planner-detail-rating-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.planner-detail-rating-head span,
+.planner-score-row small {
+  color: var(--brand-ink-muted);
+  font-size: 0.98rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.planner-detail-rating-head span {
+  font-size: 0.82rem;
+}
+
+.planner-detail-rating-head strong {
+  color: var(--brand-ink-soft);
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.planner-detail-rating-head em {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  display: inline-flex;
+  align-items: center;
+  background: rgba(35, 45, 39, 0.08);
+  color: var(--brand-ink-soft);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.planner-detail-rating.score-high .planner-detail-rating-head em {
+  background: rgba(168, 212, 226, 0.38);
+  color: #254f5d;
+}
+
+.planner-detail-rating.score-medium .planner-detail-rating-head em {
+  background: var(--brand-gold);
+}
+
+.planner-detail-rating.score-low .planner-detail-rating-head em {
+  background: rgba(215, 114, 82, 0.18);
+  color: #7b3426;
+}
+
+.planner-detail-rating p {
+  margin: 0;
+  color: var(--brand-ink-muted);
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.planner-score-breakdown {
+  display: grid;
+  gap: 12px;
+}
+
+.planner-score-row {
+  display: grid;
+  gap: 6px;
+}
+
+.planner-score-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planner-score-row-top span,
+.planner-score-row-top strong {
+  color: var(--brand-ink-soft);
+  font-weight: 950;
+}
+
+.planner-score-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: rgba(35, 45, 39, 0.08);
+}
+
+.planner-score-bar span {
+  height: 100%;
+  border-radius: inherit;
+  display: block;
+  background: #5f9f73;
+}
+
+.planner-score-row:nth-child(2) .planner-score-bar span {
+  background: #6b95a8;
+}
+
+.planner-score-row:nth-child(3) .planner-score-bar span {
+  background: #d69b3a;
+}
+
 .planner-detail-info-list {
   margin-top: 18px;
   display: grid;
@@ -3300,10 +3863,18 @@ onBeforeUnmount(() => {
   font-weight: 950;
 }
 
-.planner-detail-info-list span {
+.planner-detail-info-list span,
+.planner-detail-info-list a {
   color: var(--brand-ink-muted);
   font-weight: 700;
   line-height: 1.4;
+  min-height: 1.4em;
+  overflow-wrap: anywhere;
+}
+
+.planner-detail-info-list a {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 .planner-detail-facility-grid {
@@ -3847,6 +4418,7 @@ onBeforeUnmount(() => {
   .planner-step-nav {
     position: relative;
     top: auto;
+    left: auto;
     right: auto;
     width: min(100% - var(--gutter) * 2, 980px);
     margin-left: auto;
@@ -3952,6 +4524,51 @@ onBeforeUnmount(() => {
   .planner-summary-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .planner-result-toolbar {
+    justify-content: stretch;
+  }
+
+  .planner-result-toolbar label,
+  .planner-result-toolbar select {
+    width: 100%;
+  }
+
+  .planner-destination-card {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .planner-destination-rank {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+    font-size: 1.15rem;
+  }
+
+  .planner-destination-body {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-destination-topline,
+  .planner-destination-main,
+  .planner-card-score,
+  .planner-destination-metrics,
+  .planner-feature-chip-row,
+  .planner-view-details {
+    grid-column: 1;
+  }
+
+  .planner-card-score {
+    grid-row: auto;
+    justify-items: start;
+  }
+
+  .planner-score-badge-large {
+    width: fit-content;
+    min-height: 52px;
+    flex-direction: row;
   }
 
   .route-planner-page .btn,
