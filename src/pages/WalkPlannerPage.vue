@@ -814,6 +814,16 @@ const routeMapMarkers = []
 const hasDestination = computed(() => !!result.destination)
 const selectedRecommendation = computed(() => recommendations.value.find((item) => item.id === highlightedRecommendationId.value) || null)
 const detailRecommendation = computed(() => selectedRecommendation.value)
+const finite = (value, fallback) => Number.isFinite(value) ? value : fallback
+const recommendationScoreValue = (item) => Number(item?.score)
+const recommendationDistanceValue = (item) => Number(item?.metrics?.distanceMeters)
+const compareByScoreThenDistance = (a, b) => {
+  const scoreDiff = finite(recommendationScoreValue(b), -Infinity) - finite(recommendationScoreValue(a), -Infinity)
+  if (scoreDiff !== 0) return scoreDiff
+  const distanceDiff = finite(recommendationDistanceValue(a), Infinity) - finite(recommendationDistanceValue(b), Infinity)
+  if (distanceDiff !== 0) return distanceDiff
+  return String(a?.id || '').localeCompare(String(b?.id || ''))
+}
 const visibleRecommendations = computed(() => {
   const items = [...recommendations.value]
   const valueFor = (item, key) => {
@@ -824,17 +834,21 @@ const visibleRecommendations = computed(() => {
     return Number.NaN
   }
 
-  const finite = (value, fallback) => Number.isFinite(value) ? value : fallback
-
   if (recommendationSort.value === 'distance-asc') {
     return items.sort((a, b) => finite(valueFor(a, 'distance'), Infinity) - finite(valueFor(b, 'distance'), Infinity))
   }
   if (recommendationSort.value === 'shade-desc') {
     return items.sort((a, b) => finite(valueFor(b, 'shade'), -Infinity) - finite(valueFor(a, 'shade'), -Infinity))
   }
-  return items.sort((a, b) => finite(valueFor(b, 'score'), -Infinity) - finite(valueFor(a, 'score'), -Infinity))
+  return items.sort(compareByScoreThenDistance)
 })
 const topRecommendationScore = computed(() => Math.max(...recommendations.value.map((item) => Number(item.score)).filter(Number.isFinite), -Infinity))
+const topRecommendationId = computed(() => {
+  const topRecommendation = recommendations.value
+    .filter((item) => Number.isFinite(recommendationScoreValue(item)))
+    .sort(compareByScoreThenDistance)[0]
+  return topRecommendation?.id || ''
+})
 const topShadeCoverage = computed(() => Math.max(...recommendations.value.map((item) => Number(item.metrics?.shadeCoverage)).filter(Number.isFinite), -Infinity))
 const destinationKind = computed(() => selectedType.value || result.destination?.type || selectedSpecificDestination.value?.type || '')
 const selectedTypeLabel = computed(() => destinationTypes.find((d) => d.id === selectedType.value)?.label || selectedSpecificDestination.value?.type || 'Destination')
@@ -1096,7 +1110,9 @@ const recommendationSummaryNotes = (recommendation) => {
 }
 const isMostRecommended = (recommendation) => {
   const score = Number(recommendation?.score)
-  return Number.isFinite(score) && Number.isFinite(topRecommendationScore.value) && score === topRecommendationScore.value
+  return Number.isFinite(score)
+    && Number.isFinite(topRecommendationScore.value)
+    && recommendation?.id === topRecommendationId.value
 }
 const isBestShade = (recommendation) => {
   const shade = Number(recommendation?.metrics?.shadeCoverage)
