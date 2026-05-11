@@ -814,13 +814,28 @@ const routeMapMarkers = []
 const hasDestination = computed(() => !!result.destination)
 const selectedRecommendation = computed(() => recommendations.value.find((item) => item.id === highlightedRecommendationId.value) || null)
 const detailRecommendation = computed(() => selectedRecommendation.value)
+const RECOMMENDATION_SCORE_TOLERANCE = 5
 const finite = (value, fallback) => Number.isFinite(value) ? value : fallback
 const recommendationScoreValue = (item) => Number(item?.score)
 const recommendationDistanceValue = (item) => Number(item?.metrics?.distanceMeters)
 const compareByScoreThenDistance = (a, b) => {
-  const scoreDiff = finite(recommendationScoreValue(b), -Infinity) - finite(recommendationScoreValue(a), -Infinity)
+  const aScore = finite(recommendationScoreValue(a), -Infinity)
+  const bScore = finite(recommendationScoreValue(b), -Infinity)
+  const aDistance = finite(recommendationDistanceValue(a), Infinity)
+  const bDistance = finite(recommendationDistanceValue(b), Infinity)
+  const distanceDiff = aDistance - bDistance
+  if (
+    Number.isFinite(aScore)
+    && Number.isFinite(bScore)
+    && Number.isFinite(aDistance)
+    && Number.isFinite(bDistance)
+    && Math.abs(aScore - bScore) <= RECOMMENDATION_SCORE_TOLERANCE
+    && distanceDiff !== 0
+  ) {
+    return distanceDiff
+  }
+  const scoreDiff = bScore - aScore
   if (scoreDiff !== 0) return scoreDiff
-  const distanceDiff = finite(recommendationDistanceValue(a), Infinity) - finite(recommendationDistanceValue(b), Infinity)
   if (distanceDiff !== 0) return distanceDiff
   return String(a?.id || '').localeCompare(String(b?.id || ''))
 }
