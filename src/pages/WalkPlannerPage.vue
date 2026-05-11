@@ -925,13 +925,27 @@ const detailScoreBreakdownRows = computed(() => {
         : 'Shorter routes score higher'
     }
   ]
+  if (breakdown.slopeCoverage !== undefined && breakdown.slopeCoverage !== null) {
+    const slopeIncluded = Boolean(breakdown.slopeIncludedInScore)
+    const averageSlope = Number(breakdown.averageSlopePercent)
+    rows.push({
+      key: 'slope',
+      label: 'Slope',
+      value: Number(breakdown.slope),
+      max: Number(weights.slope ?? 15),
+      meta: slopeIncluded && Number.isFinite(averageSlope)
+        ? `${averageSlope.toFixed(1)}% average slope`
+        : 'Slope information limited for this route',
+      displayOverride: slopeIncluded ? '' : 'Not included'
+    })
+  }
 
   return rows.map((row) => {
     const value = Number.isFinite(row.value) ? row.value : 0
     const max = Number.isFinite(row.max) && row.max > 0 ? row.max : 1
     return {
       ...row,
-      displayValue: `${formatScorePart(value)} / ${formatScorePart(max)}`,
+      displayValue: row.displayOverride || `${formatScorePart(value)} / ${formatScorePart(max)}`,
       percent: Math.max(0, Math.min(100, Math.round((value / max) * 100)))
     }
   })
