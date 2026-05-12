@@ -71,6 +71,10 @@ declare global {
   }
 }
 
+const emit = defineEmits<{
+  learnMore: [score: number];
+}>();
+
 const concernLabels = ['No data', 'Lower', 'Low', 'Moderate', 'High', 'Higher'];
 const concernColors: Record<number, string> = {
   0: '#e0dbd3',
@@ -113,6 +117,8 @@ const metricValue = (feature?: RawFeature) => feature?.properties.HVI_2018 ?? 0;
 const selectedLevel = computed(() => concernLabels[metricValue(selectedFeature.value)] ?? concernLabels[0]);
 
 const selectedScore = computed(() => metricValue(selectedFeature.value));
+
+const hasSelection = computed(() => Boolean(selectedFeature.value));
 
 const loadLeaflet = async () => {
   if (window.L) return window.L;
@@ -192,6 +198,8 @@ const selectLayer = (layer: LeafletLayer, shouldZoom = false) => {
       duration: 0.8,
     });
   }
+
+  nextTick(() => map?.invalidateSize());
 };
 
 const findLayerForFeature = (feature: RawFeature) => {
@@ -327,6 +335,7 @@ const chooseSuggestion = (feature: RawFeature) => {
     search.value = feature.properties.LOCALITY;
     showSuggestions.value = false;
     status.value = `Selected ${feature.properties.LOCALITY}.`;
+    nextTick(() => map?.invalidateSize());
   }
   fitMapToFeature(feature);
 };
@@ -336,13 +345,26 @@ const onSearchEnter = () => {
   if (first) chooseSuggestion(first);
 };
 
+const onLearnMore = () => {
+  if (!selectedFeature.value) return;
+  emit('learnMore', selectedScore.value);
+};
+
 const resetView = () => {
   if (!geoJsonLayer) return;
+  if (selectedLayer) {
+    geoJsonLayer.resetStyle(selectedLayer);
+    selectedLayer = undefined;
+  }
+  selectedFeature.value = undefined;
+  search.value = '';
+  showSuggestions.value = false;
   map?.fitBounds(geoJsonLayer.getBounds(), {
     padding: [20, 20],
     animate: true,
   });
   status.value = 'Map view reset.';
+  nextTick(() => map?.invalidateSize());
 };
 
 const setupMap = async () => {
@@ -405,9 +427,6 @@ const setupMap = async () => {
     baseZoom = map.getZoom();
     updateLabelBand();
     map.on('zoomend', updateLabelBand);
-
-    const firstLayer = findLayerForFeature(data.features[0]);
-    if (firstLayer) selectLayer(firstLayer);
 
     status.value = `${data.features.length.toLocaleString()} suburbs loaded from the original HVI map.`;
     await nextTick();
@@ -473,7 +492,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="hvi-map__body">
+    <div :class="['hvi-map__body', { 'hvi-map__body--with-panel': hasSelection }]">
       <div :class="['hvi-map__map-shell', `hvi-map__map-shell--labels-${labelBand}`]">
         <div
           ref="mapEl"
@@ -491,12 +510,18 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <aside class="hvi-map__panel" aria-live="polite">
+      <aside v-if="selectedFeature" class="hvi-map__panel" aria-live="polite">
         <span class="hvi-map__eyebrow">Selected suburb</span>
         <h3>{{ localityName }}</h3>
         <p>
           HVI 2018: {{ selectedScore }} / 5 —
           <strong>{{ selectedLevel }}</strong>
+          <span class="hvi-map__source-info">
+            <button type="button" aria-describedby="hvi-source-note" aria-label="Show data source">i</button>
+            <span id="hvi-source-note" class="hvi-map__source-bubble" role="tooltip">
+              Data source: DELWP Urban Heat Islands and Heat Vulnerability Assessment in Melbourne, 2018.
+            </span>
+          </span>
         </p>
 
         <div class="hvi-map__score-dots" aria-label="HVI score out of five">
@@ -526,9 +551,12 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <p class="hvi-map__note">
-          Data source: DELWP Urban Heat Islands and Heat Vulnerability Assessment in Melbourne, 2018.
-        </p>
+        <div class="hvi-map__source">
+          <button type="button" class="hvi-map__source-button" @click="onLearnMore">
+            <span>Learn More</span>
+            <i aria-hidden="true">→</i>
+          </button>
+        </div>
       </aside>
     </div>
 
@@ -540,7 +568,8 @@ onBeforeUnmount(() => {
 .hvi-map {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
+  margin-top: clamp(38px, 6vw, 76px);
 }
 
 .hvi-map__toolbar {
@@ -553,7 +582,7 @@ onBeforeUnmount(() => {
 .hvi-map__toolbar strong {
   display: block;
   color: var(--brand-ink);
-  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-size: clamp(1.7rem, 2.45vw, 2.35rem);
   font-weight: 950;
   line-height: 1.12;
 }
@@ -574,14 +603,14 @@ onBeforeUnmount(() => {
 
 .hvi-map__search input {
   width: 100%;
-  min-height: var(--brand-touch);
-  padding: 0 16px;
+  min-height: 58px;
+  padding: 0 20px;
   border: 1.5px solid var(--brand-line);
-  border-radius: 18px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.78);
   color: var(--brand-ink);
   font: inherit;
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 750;
 }
 
@@ -615,9 +644,13 @@ onBeforeUnmount(() => {
 
 .hvi-map__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: stretch;
+}
+
+.hvi-map__body--with-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
 }
 
 .hvi-map__map-shell {
@@ -749,6 +782,18 @@ onBeforeUnmount(() => {
   border: 1px solid var(--brand-line);
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.72);
+  animation: hvi-panel-in 360ms var(--ease-out-expo) both;
+}
+
+@keyframes hvi-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .hvi-map__eyebrow {
@@ -839,11 +884,144 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(16, 19, 15, 0.08);
 }
 
-.hvi-map__note,
 .hvi-map__status {
   color: var(--brand-ink-muted);
   font-size: 0.95rem;
   font-weight: 650;
+}
+
+.hvi-map__source {
+  width: fit-content;
+  margin-top: 14px;
+}
+
+.hvi-map__source-button {
+  min-width: min(100%, 250px);
+  min-height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 10px 0 26px;
+  border: 1px solid transparent;
+  border-radius: 26px;
+  background: var(--brand-lime);
+  color: var(--brand-ink);
+  box-shadow: var(--brand-shadow-nav);
+  font-size: 1.08rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  transition:
+    border-color var(--d-fast) ease,
+    background var(--d-fast) ease,
+    color var(--d-fast) ease,
+    transform var(--d-fast) ease;
+}
+
+.hvi-map__source-button i {
+  width: 46px;
+  height: 46px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--brand-ink);
+  font-size: 1.35rem;
+  font-style: normal;
+  font-weight: 950;
+  line-height: 1;
+  transition:
+    background var(--d-fast) ease,
+    transform var(--d-fast) ease;
+}
+
+.hvi-map__source-button:hover,
+.hvi-map__source-button:focus-visible {
+  border-color: rgba(35, 45, 39, 0.12);
+  background: var(--brand-lime-hover);
+  color: var(--brand-ink);
+  transform: translateY(-1px);
+}
+
+.hvi-map__source-button:hover i,
+.hvi-map__source-button:focus-visible i {
+  background: #ffffff;
+  transform: translateX(2px);
+}
+
+.hvi-map__source-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.hvi-map__source-info button {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(98, 133, 107, 0.22);
+  border-radius: 50%;
+  background: rgba(98, 133, 107, 0.14);
+  color: var(--shade-deep);
+  font-family: var(--font-editorial);
+  font-size: 0.95rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.hvi-map__source-info button:hover,
+.hvi-map__source-info button:focus-visible {
+  border-color: rgba(98, 133, 107, 0.44);
+  background: rgba(228, 248, 213, 0.48);
+  color: var(--brand-ink-soft);
+}
+
+.hvi-map__source-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 4;
+  width: min(280px, calc(100vw - 64px));
+  padding: 14px 16px;
+  border: 1px solid rgba(35, 45, 39, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--brand-shadow-nav);
+  color: var(--brand-ink-muted);
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity var(--d-fast) ease,
+    transform var(--d-fast) ease;
+}
+
+.hvi-map__source-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  border-right: 1px solid rgba(35, 45, 39, 0.12);
+  border-bottom: 1px solid rgba(35, 45, 39, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.hvi-map__source-info:hover .hvi-map__source-bubble,
+.hvi-map__source-info:focus-within .hvi-map__source-bubble {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .hvi-map__status {
@@ -852,7 +1030,8 @@ onBeforeUnmount(() => {
 
 @media (max-width: 980px) {
   .hvi-map__toolbar,
-  .hvi-map__body {
+  .hvi-map__body,
+  .hvi-map__body--with-panel {
     grid-template-columns: 1fr;
   }
 
