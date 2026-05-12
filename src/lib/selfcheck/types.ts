@@ -119,3 +119,64 @@ export interface DailyForecast {
   uv_max: number;
   apparent_max: number;
 }
+
+// ─── House planner ────────────────────────────────────────────
+
+export type Orientation = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+
+export type WallSide = 'top' | 'right' | 'bottom' | 'left';
+
+export type FloorLevel = 'ground' | 'middle' | 'top' | 'unknown';
+
+export interface GridSize {
+  cols: number;
+  rows: number;
+}
+
+export interface HouseRoom {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface HouseWindow {
+  id: string;
+  roomId: string;
+  wall: WallSide;
+  cellIndex: number;
+  orientation: Orientation;
+  hasCurtain: boolean;
+  fanNearby: boolean;
+}
+
+export interface HouseDoor {
+  id: string;
+  roomId: string;
+  wall: WallSide;
+  cellIndex: number;
+  isExternal: boolean;
+}
+
+export interface HousePlan {
+  gridSize: GridSize;
+  houseFacing: Orientation;
+  floorLevel: FloorLevel;
+  frontDoorId: string | null;
+  rooms: HouseRoom[];
+  windows: HouseWindow[];
+  doors: HouseDoor[];
+}
+
+export interface HouseActionCard {
+  id: string;
+  category: 'shade' | 'airflow' | 'fan' | 'emergency' | 'planning';
+  title: string;
+  body: string;
+  why?: string;
+  targetWindowId?: string;
+  targetRoomId?: string;
+  severity?: 'info' | 'warn' | 'urgent';
+}

@@ -8,6 +8,8 @@ import AreaProfileGrid from '@/components/selfcheck/AreaProfileGrid.vue';
 import CoolPlaceStrip from '@/components/selfcheck/CoolPlaceStrip.vue';
 import Wizard from '@/components/selfcheck/Wizard.vue';
 import ResultDashboard from '@/components/selfcheck/ResultDashboard.vue';
+import ModeSwitcher, { type SelfCheckMode } from '@/components/selfcheck/ModeSwitcher.vue';
+import HousePlanner from '@/components/selfcheck/houseplanner/HousePlanner.vue';
 
 import {
   findSuburbByKey,
@@ -35,6 +37,7 @@ const snapshotError = ref<string | null>(null);
 
 const answers = reactive<SelfCheckAnswers>(emptyAnswers());
 const hasResult = ref(false);
+const mode = ref<SelfCheckMode>('wizard');
 
 const result = computed(() => calculateScores(area.value, answers));
 
@@ -88,6 +91,11 @@ function onRestart() {
 
 function scrollToWizard() {
   wizardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function onModeChange(next: SelfCheckMode) {
+  mode.value = next;
+  nextTick(() => wizardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
 
 function scrollToArea() {
@@ -159,31 +167,45 @@ const coolPlaceTitle = computed(() => {
         </div>
       </section>
 
-      <!-- §4 Self-Check Wizard -->
+      <!-- §4 Self-Check / Home planner -->
       <section id="wizard" ref="wizardRef" class="sc-section sc-section--wizard">
         <div class="sc-section__inner sc-section__inner--narrow">
           <header class="sc-head sc-head--center">
-            <SectionKicker>3-minute self-check</SectionKicker>
-            <h2>Tell us a little about you</h2>
-            <p>
+            <SectionKicker>{{ mode === 'wizard' ? '3-minute self-check' : 'Home heat planner' }}</SectionKicker>
+            <h2>{{ mode === 'wizard' ? 'Tell us a little about you' : 'Map your home for room-by-room tips' }}</h2>
+            <p v-if="mode === 'wizard'">
               Four short steps about your health, home, and the people around you.
               Your answers turn today's forecast above into clear, personal next steps —
               not generic heat advice.
             </p>
+            <p v-else>
+              Pick a layout that's close to your home, mark which windows have curtains or fans,
+              and we'll combine that with today's forecast and the sun's position to give you
+              advice for specific rooms and windows.
+            </p>
           </header>
+          <div class="sc-mode-switch">
+            <ModeSwitcher :mode="mode" @update:mode="onModeChange" />
+          </div>
           <Wizard
+            v-if="mode === 'wizard'"
             :area="area"
             :suburb="suburb"
             :answers="answers"
             @update:answers="onAnswersChange"
             @submit="onSubmit"
           />
+          <HousePlanner
+            v-else
+            :suburb="suburb"
+            :snapshot="snapshot"
+          />
         </div>
       </section>
 
-      <!-- §5 Result -->
+      <!-- §5 Result (wizard only) -->
       <section
-        v-if="hasResult"
+        v-if="hasResult && mode === 'wizard'"
         id="result"
         ref="resultRef"
         class="sc-section sc-section--result"
@@ -288,6 +310,12 @@ const coolPlaceTitle = computed(() => {
   gap: 16px;
   flex-wrap: wrap;
   margin-top: 6px;
+}
+
+.sc-mode-switch {
+  display: flex;
+  justify-content: center;
+  margin: -8px 0 18px;
 }
 
 .sc-head {
