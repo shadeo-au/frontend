@@ -11,6 +11,7 @@
   "dependencies": {
     "@fontsource/bitter": "^5.2.10",
     "@fontsource/caveat": "^5.2.8",
+    "@iconify/vue": "^5.0.1",
     "@vitejs/plugin-vue": "^5.2.3",
     "maplibre-gl": "^5.24.0",
     "pmtiles": "^4.4.1",

@@ -9,8 +9,8 @@
         v-for="item in plannerSteps"
         :key="item.id"
         type="button"
-        :disabled="!canNavigateToStep(item.id)"
-        :class="{ active: currentStep === item.id, done: item.id < currentStep && canNavigateToStep(item.id), locked: !canNavigateToStep(item.id) }"
+        :disabled="!canNavigateToStep(item.id) && currentStep !== item.id"
+        :class="{ active: currentStep === item.id, done: item.id < currentStep && canNavigateToStep(item.id), locked: !canNavigateToStep(item.id) && currentStep !== item.id }"
         @click="jumpToStep(item.id)"
       >
         <span>{{ item.id }}</span>
@@ -22,18 +22,14 @@
       <section class="planner-flow-hero">
         <p class="planner-flow-kicker">Walk Planner</p>
         <h1>Plan a cooler, easier walk.</h1>
-        <p>
-          Choose where you are starting, pick a daily destination, and compare nearby
-          walking options before opening the full route map.
-        </p>
+      
       </section>
 
-      <article v-if="currentStep === 1" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="startSectionEl">
+      <article v-if="visibleStep === 1" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="startSectionEl">
         <div class="planner-card-heading">
           <span>1</span>
           <div>
             <h2>Starting point</h2>
-            <p>Choose how Shadeo should set where your walk begins.</p>
           </div>
         </div>
 
@@ -44,7 +40,7 @@
             </span>
             <span>
               <strong>{{ isLocating ? 'Detecting your current location...' : 'Use my current location' }}</strong>
-              <small>Best when you are already at the starting point.</small>
+
             </span>
           </button>
 
@@ -54,7 +50,7 @@
             </span>
             <span>
               <strong>Search address or place</strong>
-              <small>Type a street address, suburb, or landmark as your starting point.</small>
+              <small>Type a street address or landmark as your starting point.</small>
             </span>
           </button>
         </div>
@@ -83,9 +79,16 @@
             :class="{ active: selectedStart?.id === place.id }"
             @click="selectStartPlace(place)"
           >
-            <strong>{{ place.name }}</strong>
-            <small>{{ place.address }}</small>
+            <Icon class="planner-search-result-icon" :icon="categoryDisplay(place).icon" aria-hidden="true" />
+            <span class="planner-search-result-text">
+              <strong>{{ place.name }}</strong>
+              <small>{{ place.address }}</small>
+              <span v-if="place.category" class="planner-search-result-tag">{{ categoryDisplay(place).label }}</span>
+            </span>
           </button>
+          <p v-if="startOutOfAreaCount > 0" class="planner-search-hint">
+            {{ startOutOfAreaCount }} more result{{ startOutOfAreaCount === 1 ? '' : 's' }} outside our Central Melbourne coverage hidden.
+          </p>
         </div>
 
         <p v-if="selectedStart" class="planner-selection-note">
@@ -96,17 +99,12 @@
         </p>
       </article>
 
-      <article v-if="currentStep === 2" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="destinationSectionEl">
-        <button class="planner-step-back-btn" type="button" @click="jumpToStep(1)">
-          <span aria-hidden="true">&lt;</span>
-          Back
-        </button>
-
+      <article v-if="visibleStep === 2" class="planner-card planner-step-card planner-guided-card planner-step-pop" ref="destinationSectionEl">
         <div class="planner-card-heading">
           <span>2</span>
           <div>
             <h2>Destination</h2>
-            <p>First choose whether you already know the place, or want Shadeo to suggest by category.</p>
+            
           </div>
         </div>
 
@@ -120,7 +118,7 @@
         </div>
 
         <div v-if="destinationMode === 'category'" class="planner-category-panel">
-          <p class="planner-panel-instruction">Select one destination type. Shadeo will request nearby route options from the backend.</p>
+          <p class="planner-panel-instruction">Select one destination type. Shadeo will look for nearby walking options.</p>
           <div class="planner-type-grid planner-type-grid-clean">
             <button
               v-for="item in destinationTypes"
@@ -131,7 +129,7 @@
               @click="chooseDestinationType(item.id)"
             >
               <span class="planner-type-icon" aria-hidden="true">
-                <img :src="item.icon" alt="" />
+                <Icon :icon="item.iconName" />
               </span>
               <span class="planner-type-name">{{ item.label }}</span>
             </button>
@@ -162,19 +160,36 @@
             :class="{ active: selectedSpecificDestination?.id === place.id }"
             @click="selectSpecificDestination(place)"
           >
-            <strong>{{ place.name }}</strong>
-            <small>{{ place.address }}</small>
+            <Icon class="planner-search-result-icon" :icon="categoryDisplay(place).icon" aria-hidden="true" />
+            <span class="planner-search-result-text">
+              <strong>{{ place.name }}</strong>
+              <small>{{ place.address }}</small>
+              <span v-if="place.category" class="planner-search-result-tag">{{ categoryDisplay(place).label }}</span>
+            </span>
           </button>
+          <p v-if="destinationOutOfAreaCount > 0" class="planner-search-hint">
+            {{ destinationOutOfAreaCount }} more result{{ destinationOutOfAreaCount === 1 ? '' : 's' }} outside our Central Melbourne coverage hidden.
+          </p>
         </div>
 
-        <p v-if="destinationReadyLabel" class="planner-selection-note">
-          Destination choice: <strong>{{ destinationReadyLabel }}</strong>
-        </p>
         <p v-if="destinationValidationMessage" class="planner-selection-note planner-selection-note-error">
           {{ destinationValidationMessage }}
         </p>
 
+        <label class="planner-shade-toggle">
+          <input type="checkbox" v-model="preferShade" />
+          <Icon icon="material-symbols:park" class="planner-shade-toggle-icon" aria-hidden="true" />
+          <span class="planner-shade-toggle-text">
+            <strong>Prefer shaded route</strong>
+            <small>Walk under tree cover where possible (slightly longer)</small>
+          </span>
+        </label>
+
         <div class="planner-flow-action">
+          <button class="btn planner-change-btn planner-return-btn" type="button" @click="jumpToStep(1)">
+            <span aria-hidden="true">&lt;</span>
+            Back
+          </button>
           <button class="btn btn-primary planner-continue-btn" type="button" :disabled="!canFindRecommendations || isLoadingPlan" @click="requestPlan">
             {{ isLoadingPlan ? 'Requesting route...' : 'Next' }}
             <span aria-hidden="true">&gt;</span>
@@ -184,42 +199,60 @@
       </article>
 
       <section class="planner-result-anchor" ref="resultsSectionEl">
-        <article v-if="currentStep === 3 && isLoadingPlan" class="planner-card planner-result-loading-card planner-step-pop">
+        <article v-if="visibleStep === 3 && isLoadingPlan" class="planner-card planner-result-loading-card planner-step-pop">
           <span class="planner-spinner" aria-hidden="true"></span>
           <h3>Requesting your route...</h3>
-          <p>Shadeo is checking the backend planner for the nearest suitable result.</p>
+          <p>Shadeo is checking nearby walking options for you.</p>
         </article>
 
-        <article v-else-if="currentStep === 3 && hasSearched && recommendations.length && !hasDestination" class="planner-card planner-recommendation-layout planner-step-pop">
+        <article v-else-if="visibleStep === 3 && hasSearched && recommendations.length" class="planner-card planner-recommendation-layout planner-step-pop">
           <div class="planner-recommendation-list">
-            <button class="planner-step-back-btn" type="button" @click="jumpToStep(2)">
-              <span aria-hidden="true">&lt;</span>
-              Back
-            </button>
-
             <div class="planner-section-headline">
               <p>Results</p>
               <h3>Compare nearby options</h3>
               <span>Select an option to preview its details.</span>
             </div>
+            <div class="planner-result-toolbar">
+              <label>
+                Sort by
+                <select v-model="recommendationSort">
+                  <option value="score-desc">Highest score</option>
+                  <option value="distance-asc">Shortest distance</option>
+                  <option value="shade-desc">Most shade</option>
+                </select>
+              </label>
+            </div>
             <article
-              v-for="(item, index) in recommendations"
+              v-for="(item, index) in visibleRecommendations"
               :key="item.id"
               class="planner-destination-card"
-              :class="{ 'is-top-result': index === 0, 'is-selected': highlightedRecommendationId === item.id }"
+              :class="{ 'is-top-result': isMostRecommended(item), 'is-selected': highlightedRecommendationId === item.id }"
               @click="highlightRecommendation(item)"
             >
               <span class="planner-destination-rank">{{ index + 1 }}</span>
               <span class="planner-destination-body">
                 <span class="planner-destination-topline">
-                  <span v-if="index === 0" class="planner-rec-label">Most Recommended</span>
-                  <span class="planner-score-badge" :class="scoreTone(item.score)">
-                    <span aria-hidden="true">Score</span>
-                    {{ formatScore(item.score) }}
+                  <span
+                    v-for="badge in recommendationBadges(item)"
+                    :key="badge.label"
+                    class="planner-rec-label"
+                    :class="badge.tone"
+                  >
+                    <Icon :icon="badge.icon" aria-hidden="true" />
+                    {{ badge.label }}
                   </span>
                 </span>
-                <strong>{{ item.destination.name }}</strong>
-                <small class="planner-destination-address">{{ item.destination.address }}</small>
+                <span class="planner-destination-main">
+                  <strong>{{ item.destination.name }}</strong>
+                  <small class="planner-destination-address">{{ item.destination.address }}</small>
+                </span>
+                <span class="planner-card-score">
+                  <span>Route score</span>
+                  <span class="planner-score-badge planner-score-badge-large" :class="scoreTone(item.score)">
+                    <strong>{{ formatCompactScore(item.score) }}</strong>
+                    <small>{{ item.ratingLabel || ratingLabelFromScore(item.score) }}</small>
+                  </span>
+                </span>
                 <span class="planner-destination-metrics">
                   <span>
                     <img :src="timeIcon" alt="" aria-hidden="true" />
@@ -230,130 +263,170 @@
                     {{ formatDistance(item.metrics.distanceMeters) }}
                   </span>
                 </span>
-                <span class="planner-tag-row">
-                  <em v-for="note in item.comfortNotes.slice(0, index === 0 ? 3 : 2)" :key="note">{{ note }}</em>
+                <span v-if="recommendationFeatureChips(item).length" class="planner-tag-row planner-feature-chip-row">
+                  <em
+                    v-for="chip in recommendationFeatureChips(item)"
+                    :key="chip.key"
+                    :class="chip.tone"
+                  >
+                    <img v-if="chip.iconSrc" :src="chip.iconSrc" alt="" aria-hidden="true" />
+                    <Icon v-else :icon="chip.icon" aria-hidden="true" />
+                    {{ chip.label }}
+                  </em>
                 </span>
                 <button
                   v-if="highlightedRecommendationId === item.id"
                   class="planner-view-details"
                   type="button"
-                  @click.stop="selectRecommendation(item)"
+                  @click.stop="openRecommendationDetails(item)"
                 >
-                  Next <span aria-hidden="true">&gt;</span>
+                  View detail
                 </button>
               </span>
             </article>
+            <div class="planner-result-actions">
+              <button class="btn planner-change-btn planner-return-btn" type="button" @click="jumpToStep(2)">
+                <span aria-hidden="true">&lt;</span>
+                Back
+              </button>
+              <button class="btn btn-primary planner-see-route-btn" type="button" :disabled="!selectedRecommendation || !canSeeRoute" @click="openRouteReadinessPrompt">
+                See route <span aria-hidden="true">&gt;</span>
+              </button>
+            </div>
           </div>
           <div class="planner-mini-map-panel">
             <div class="planner-mini-map-head">
               <strong>Nearby options</strong>
-              <span>Backend destination pin and your selected start point</span>
+              <span>Your selected start point and the nearby options.</span>
             </div>
             <div ref="miniMapEl" class="planner-mini-map"></div>
           </div>
         </article>
 
-        <article v-else-if="currentStep === 3 && hasSearched && !isLoadingPlan && !recommendations.length" class="planner-card planner-result-loading-card planner-step-pop">
+        <article v-else-if="visibleStep === 3 && hasSearched && !isLoadingPlan && !recommendations.length" class="planner-card planner-result-loading-card planner-step-pop">
           <button class="planner-step-back-btn" type="button" @click="jumpToStep(2)">
             <span aria-hidden="true">&lt;</span>
             Back
           </button>
-          <h3>No route result found</h3>
-          <p>{{ planError || 'The backend did not return a suitable destination for this start point and category.' }}</p>
-        </article>
-
-        <article v-else-if="currentStep === 3 && hasDestination" class="planner-card planner-recommendation-layout planner-detail-layout planner-step-pop">
-          <div class="planner-detail-panel">
-            <button class="planner-back-btn" type="button" @click="backToRecommendations">Back</button>
-            <div class="planner-detail-title-row">
-              <img :src="selectedTypeIconUrl" alt="" />
-              <div>
-                <p>{{ result.destination.address }}</p>
-                <h3>{{ result.destination.name }}</h3>
-              </div>
-            </div>
-
-            <div class="planner-metric-row">
-              <span class="planner-metric-chip">
-                <img :src="walkIcon" alt="" aria-hidden="true" />
-                <strong>{{ distanceMetric.value }}</strong>
-                <em>{{ distanceMetric.unit }}</em>
-                <small>away</small>
-              </span>
-              <span class="planner-metric-chip">
-                <img :src="timeIcon" alt="" aria-hidden="true" />
-                <strong>{{ walkMetric.value }}</strong>
-                <em>{{ walkMetric.unit }}</em>
-                <small>walk</small>
-              </span>
-            </div>
-
-            <div class="planner-detail-facilities">
-              <h3>Along the way</h3>
-              <div class="rv-fac-grid">
-                <div class="rv-fac-card rv-fac-bench" v-if="facilityBreakdown.bench > 0">
-                  <img :src="benchIcon" alt="" />
-                  <div>
-                    <strong>{{ facilityBreakdown.bench }}</strong>
-                    <span>Benches</span>
-                  </div>
-                </div>
-                <div class="rv-fac-card rv-fac-toilet" v-if="facilityBreakdown.toilet > 0">
-                  <img :src="toiletIcon" alt="" />
-                  <div>
-                    <strong>{{ facilityBreakdown.toilet }}</strong>
-                    <span>Toilets</span>
-                  </div>
-                </div>
-                <div class="rv-fac-card rv-fac-fountain" v-if="facilityBreakdown.drinking_fountain > 0">
-                  <img :src="fountainIcon" alt="" />
-                  <div>
-                    <strong>{{ facilityBreakdown.drinking_fountain }}</strong>
-                    <span>Fountains</span>
-                  </div>
-                </div>
-                <div
-                  v-if="facilityBreakdown.bench === 0 && facilityBreakdown.toilet === 0 && facilityBreakdown.drinking_fountain === 0"
-                  class="rv-no-facilities"
-                >
-                  No support facilities were returned along this route
-                </div>
-              </div>
-            </div>
-
-            <div class="planner-summary-actions">
-              <button class="btn btn-primary planner-see-route-btn" @click="openReadinessCheck" :disabled="!canSeeRoute">
-                Next
-              </button>
-              <button class="btn planner-change-btn planner-return-btn" @click="backToRecommendations">
-                Back
-              </button>
-            </div>
-          </div>
-          <div class="planner-mini-map-panel">
-            <div class="planner-mini-map-head">
-              <strong>Route preview</strong>
-              <span>Start and destination locations only</span>
-            </div>
-            <div ref="miniMapEl" class="planner-mini-map"></div>
-          </div>
+          <h3>No walking option found</h3>
+          <p>{{ planError || 'We could not find a suitable walking option for this start point and destination.' }}</p>
         </article>
       </section>
     </section>
 
+    <div v-if="isDetailOpen && detailRecommendation" class="planner-detail-backdrop" role="presentation" @click.self="closeRecommendationDetails">
+      <section class="planner-detail-modal planner-card" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <button class="planner-modal-close" type="button" aria-label="Close details" @click="closeRecommendationDetails">X</button>
+        <div class="planner-detail-title-row">
+          <img :src="recommendationTypeIconUrl(detailRecommendation)" alt="" />
+          <div>
+            <h3 id="detail-title">{{ detailRecommendation.destination.name }}</h3>
+          </div>
+        </div>
+        <div class="planner-detail-grid">
+          <span class="planner-metric-chip">
+            <img :src="walkIcon" alt="" aria-hidden="true" />
+            <strong>{{ formatDistance(detailRecommendation.metrics.distanceMeters) }}</strong>
+            <small>away</small>
+          </span>
+          <span class="planner-metric-chip">
+            <img :src="timeIcon" alt="" aria-hidden="true" />
+            <strong>{{ formatMinutes(detailRecommendation.metrics.durationMinutes) }}</strong>
+            <small>walk</small>
+          </span>
+          <span class="planner-metric-chip planner-metric-chip-shade">
+            <Icon icon="material-symbols:park" aria-hidden="true" />
+            <strong>{{ recommendationShadeLabel(detailRecommendation) }}</strong>
+            <small>tree shade</small>
+          </span>
+        </div>
+        <section v-if="hasDetailScore" class="planner-detail-rating" :class="scoreTone(detailRecommendation.score)">
+          <div class="planner-detail-rating-head">
+            <div>
+              <span>Route rating</span>
+              <strong>{{ detailRatingLabel }}</strong>
+            </div>
+            <em>{{ formatScore(detailRecommendation.score) }}</em>
+          </div>
+          <p v-if="detailRecommendation.ratingReason">{{ detailRecommendation.ratingReason }}</p>
+          <div class="planner-score-breakdown">
+            <div v-for="row in detailScoreBreakdownRows" :key="row.key" class="planner-score-row">
+              <div class="planner-score-row-top">
+                <span>{{ row.label }}</span>
+                <strong>{{ row.displayValue }}</strong>
+              </div>
+              <div class="planner-score-bar" aria-hidden="true">
+                <span :style="{ width: `${row.percent}%` }"></span>
+              </div>
+              <small>{{ row.meta }}</small>
+            </div>
+          </div>
+        </section>
+        <div class="planner-detail-info-list">
+          <div v-for="row in detailInfoRows" :key="row.key">
+            <strong>{{ row.label }}</strong>
+            <a v-if="row.href" :href="row.href" target="_blank" rel="noreferrer">{{ row.value }}</a>
+            <span v-else>{{ row.value }}</span>
+          </div>
+          <div v-if="hasDetailFacilities">
+            <strong>Along the way</strong>
+            <span>{{ detailFacilitySummaryText }}</span>
+          </div>
+        </div>
+        <div class="rv-fac-grid planner-detail-facility-grid">
+          <div class="rv-fac-card rv-fac-bench">
+            <img :src="benchIcon" alt="" />
+            <div>
+              <strong>{{ detailFacilityBreakdown.bench }}</strong>
+              <span>Benches</span>
+            </div>
+          </div>
+          <div class="rv-fac-card rv-fac-toilet">
+            <img :src="toiletIcon" alt="" />
+            <div>
+              <strong>{{ detailFacilityBreakdown.toilet }}</strong>
+              <span>Toilets</span>
+            </div>
+          </div>
+          <div class="rv-fac-card rv-fac-fountain">
+            <img :src="fountainIcon" alt="" />
+            <div>
+              <strong>{{ detailFacilityBreakdown.drinking_fountain }}</strong>
+              <span>Fountains</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="isReadinessPromptOpen" class="planner-readiness-backdrop" role="presentation">
+      <section class="planner-readiness-modal planner-readiness-prompt" role="dialog" aria-modal="true" aria-labelledby="readiness-prompt-title">
+        <button class="planner-modal-close" type="button" aria-label="Skip checklist and open route" @click="skipReadinessAndOpenRoute">X</button>
+        <div class="planner-readiness-head">
+          <div>
+            <p>Before you go</p>
+            <h2 id="readiness-prompt-title">A quick readiness check is strongly recommended.</h2>
+          </div>
+        </div>
+        <p class="planner-readiness-advice">
+          The checklist helps you review weather, everyday items, and destination reminders before opening the full map.
+        </p>
+        <div class="planner-summary-actions planner-prompt-actions">
+          <button class="btn planner-change-btn" type="button" @click="skipReadinessAndOpenRoute">Skip</button>
+          <button class="btn btn-primary planner-ready-btn" type="button" @click="readReadinessChecklist">Read checklist</button>
+        </div>
+      </section>
+    </div>
+
     <div v-if="isReadinessOpen" class="planner-readiness-backdrop" role="presentation">
       <section class="planner-readiness-modal" role="dialog" aria-modal="true" aria-labelledby="readiness-title">
+        <button class="planner-modal-close" type="button" aria-label="Close checklist and open route" @click="confirmReadyToGo">X</button>
         <div class="planner-readiness-head">
           <div>
             <p>Pre-trip Check</p>
             <h2 id="readiness-title">Are you ready to go?</h2>
           </div>
         </div>
-
-        <button class="planner-step-back-btn" type="button" @click="closeReadinessToResults">
-          <span aria-hidden="true">&lt;</span>
-          Back
-        </button>
 
         <div class="planner-readiness-block planner-weather-card">
           <div class="planner-readiness-title-row">
@@ -412,16 +485,15 @@
         </div>
 
         <div class="planner-summary-actions">
-          <button class="btn btn-primary planner-ready-btn" type="button" @click="confirmReadyToGo">Next</button>
-          <button class="btn planner-change-btn" type="button" disabled>Download route summary (coming soon)</button>
+          <button class="btn btn-primary planner-ready-btn" type="button" @click="confirmReadyToGo">Open route</button>
         </div>
       </section>
     </div>
 
     <section v-if="isRouteView" class="planner-route-shell">
       <aside class="planner-route-panel rv-panel">
-        <button class="planner-back-btn rv-back-btn" @click="jumpToStep(4)">
-          <span class="rv-back-icon" aria-hidden="true">&lt;</span>
+        <button class="planner-step-back-btn rv-back-btn" @click="showStep(3)">
+          <span aria-hidden="true">&lt;</span>
           Back
         </button>
 
@@ -432,6 +504,7 @@
           <div class="rv-dest-info">
             <p class="rv-dest-type-label">{{ selectedTypeLabel }}</p>
             <h2 class="rv-dest-name">{{ result.destination?.name }}</h2>
+            <p v-if="result.destination?.address" class="rv-dest-address">{{ result.destination.address }}</p>
           </div>
         </div>
 
@@ -454,33 +527,27 @@
 
         <div class="rv-section">
           <h3>Along the way</h3>
-          <div class="rv-fac-grid">
-            <div class="rv-fac-card rv-fac-bench" v-if="facilityBreakdown.bench > 0">
+          <div class="rv-fac-grid rv-route-fac-grid">
+            <div class="rv-fac-card rv-fac-bench">
               <img :src="benchIcon" alt="" />
               <div>
                 <strong>{{ facilityBreakdown.bench }}</strong>
                 <span>Benches</span>
               </div>
             </div>
-            <div class="rv-fac-card rv-fac-toilet" v-if="facilityBreakdown.toilet > 0">
+            <div class="rv-fac-card rv-fac-toilet">
               <img :src="toiletIcon" alt="" />
               <div>
                 <strong>{{ facilityBreakdown.toilet }}</strong>
                 <span>Toilets</span>
               </div>
             </div>
-            <div class="rv-fac-card rv-fac-fountain" v-if="facilityBreakdown.drinking_fountain > 0">
+            <div class="rv-fac-card rv-fac-fountain">
               <img :src="fountainIcon" alt="" />
               <div>
                 <strong>{{ facilityBreakdown.drinking_fountain }}</strong>
                 <span>Fountains</span>
               </div>
-            </div>
-            <div
-              v-if="facilityBreakdown.bench === 0 && facilityBreakdown.toilet === 0 && facilityBreakdown.drinking_fountain === 0"
-              class="rv-no-facilities"
-            >
-              No support facilities were returned along this route
             </div>
           </div>
         </div>
@@ -529,10 +596,6 @@
           </div>
         </div>
 
-        <div class="rv-section">
-          <h3>Save route</h3>
-          <button class="btn planner-change-btn planner-export-btn" type="button" disabled>Download route summary (coming soon)</button>
-        </div>
       </aside>
 
       <section class="planner-route-map-area">
@@ -558,6 +621,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Protocol } from 'pmtiles'
 import AppNav from '../components/AppNav.vue'
+import { Icon } from '@iconify/vue'
 import pharmacyIcon from '../assets/svg/pharmacy.svg'
 import groceryIcon from '../assets/svg/grocery.svg'
 import clinicIcon from '../assets/svg/clinic.svg'
@@ -576,11 +640,11 @@ const DEFAULT_MAP_CENTER = { lat: -37.8136, lng: 144.9631 }
 const MAP_VIEW_BOUNDS = [[-37.895, 144.875], [-37.735, 145.055]]
 const MAP_MIN_ZOOM = 12
 const MAP_MAX_ZOOM = Number(import.meta.env.VITE_MAP_MAX_ZOOM || 18)
-const PMTILES_MAX_DATA_ZOOM = Number(import.meta.env.VITE_PMTILES_MAX_DATA_ZOOM || 14)
+const PMTILES_MAX_DATA_ZOOM = Number(import.meta.env.VITE_PMTILES_MAX_DATA_ZOOM || 16)
 const MUNICIPAL_BOUNDARY_URL = '/data/municipal-boundary.geojson'
-const SUPPORTED_AREA_ERROR = 'This location is outside the supported Central Melbourne area.'
+const SUPPORTED_AREA_ERROR = 'This location is outside our current Central Melbourne coverage area.'
 const MAP_STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || '/styles/positron/style.json'
-const PMTILES_URL = import.meta.env.VITE_PMTILES_URL || 'https://pub-64269a193cf745e5b366a287e94c5196.r2.dev/maps/melbourne.pmtiles'
+const PMTILES_URL = import.meta.env.VITE_PMTILES_URL || 'https://pub-64269a193cf745e5b366a287e94c5196.r2.dev/maps/melbourne-v2.pmtiles'
 const MAP_GLYPHS_URL = import.meta.env.VITE_MAP_GLYPHS_URL || '/fonts/{fontstack}/{range}.pbf'
 const MAP_SPRITE_URL = import.meta.env.VITE_MAP_SPRITE_URL || '/styles/positron/sprite'
 const ROUTE_SERVICE_URL = import.meta.env.VITE_ROUTE_SERVICE_URL || 'https://krdihvgnt5.execute-api.ap-southeast-2.amazonaws.com/default/new-route-service'
@@ -595,16 +659,20 @@ const plannerSteps = [
   { id: 1, label: 'Start' },
   { id: 2, label: 'Destination' },
   { id: 3, label: 'Results' },
-  { id: 4, label: 'Readiness' },
-  { id: 5, label: 'Route' }
+  { id: 4, label: 'Route' }
 ]
 
+// Each destination type has both `icon` (legacy SVG URL, used for map markers
+// and route-detail thumbnails) and `iconName` (Iconify Material Symbols, used
+// in the type-selector cards and recommendation cards). The Iconify names
+// match the POI_CATEGORY_DISPLAY map so cards and search results look
+// consistent throughout the app.
 const destinationTypes = [
-  { id: 'pharmacy', label: 'Pharmacy', icon: pharmacyIcon },
-  { id: 'clinic', label: 'Clinic', icon: clinicIcon },
-  { id: 'grocery', label: 'Grocery', icon: groceryIcon },
-  { id: 'cafe', label: 'Cafe', icon: cafeIcon },
-  { id: 'park', label: 'Park', icon: parkIcon }
+  { id: 'pharmacy', label: 'Pharmacy', icon: pharmacyIcon, iconName: 'material-symbols:local-pharmacy' },
+  { id: 'clinic',   label: 'Clinic',   icon: clinicIcon,   iconName: 'material-symbols:medical-services' },
+  { id: 'grocery',  label: 'Grocery',  icon: groceryIcon,  iconName: 'material-symbols:shopping-cart' },
+  { id: 'cafe',     label: 'Cafe',     icon: cafeIcon,     iconName: 'material-symbols:local-cafe' },
+  { id: 'park',     label: 'Park',     icon: parkIcon,     iconName: 'material-symbols:park' }
 ]
 
 const essentialItems = [
@@ -684,12 +752,21 @@ const startQuery = ref('')
 const destinationQuery = ref('')
 const startSearchResults = ref([])
 const destinationSearchResults = ref([])
+const startOutOfAreaCount = ref(0)
+const destinationOutOfAreaCount = ref(0)
 const recommendations = ref([])
 const highlightedRecommendationId = ref('')
+const recommendationSort = ref('score-desc')
 const isSearchingStart = ref(false)
 const isSearchingDestination = ref(false)
 const isLoadingPlan = ref(false)
+// Whether the user wants to prefer shaded streets when planning the route.
+// Sent to the backend as preferShade=true; backend returns shadeCoverage on
+// the routeSummary so we can display "Your route is N% shaded".
+const preferShade = ref(false)
 const isLocating = ref(false)
+const isDetailOpen = ref(false)
+const isReadinessPromptOpen = ref(false)
 const isReadinessOpen = ref(false)
 const isRouteView = ref(false)
 const hasSearched = ref(false)
@@ -709,6 +786,9 @@ const result = reactive({
   route: [],
   metrics: { distanceMeters: null, durationMinutes: null },
   score: null,
+  routeRating: null,
+  ratingLabel: '',
+  ratingReason: '',
   scoreBreakdown: {},
   facilitySummary: {},
   canopy: null,
@@ -732,6 +812,59 @@ const miniMapMarkers = []
 const routeMapMarkers = []
 
 const hasDestination = computed(() => !!result.destination)
+const selectedRecommendation = computed(() => recommendations.value.find((item) => item.id === highlightedRecommendationId.value) || null)
+const detailRecommendation = computed(() => selectedRecommendation.value)
+const RECOMMENDATION_SCORE_TOLERANCE = 5
+const finite = (value, fallback) => Number.isFinite(value) ? value : fallback
+const recommendationScoreValue = (item) => Number(item?.score)
+const recommendationDistanceValue = (item) => Number(item?.metrics?.distanceMeters)
+const compareByScoreThenDistance = (a, b) => {
+  const aScore = finite(recommendationScoreValue(a), -Infinity)
+  const bScore = finite(recommendationScoreValue(b), -Infinity)
+  const aDistance = finite(recommendationDistanceValue(a), Infinity)
+  const bDistance = finite(recommendationDistanceValue(b), Infinity)
+  const distanceDiff = aDistance - bDistance
+  if (
+    Number.isFinite(aScore)
+    && Number.isFinite(bScore)
+    && Number.isFinite(aDistance)
+    && Number.isFinite(bDistance)
+    && Math.abs(aScore - bScore) <= RECOMMENDATION_SCORE_TOLERANCE
+    && distanceDiff !== 0
+  ) {
+    return distanceDiff
+  }
+  const scoreDiff = bScore - aScore
+  if (scoreDiff !== 0) return scoreDiff
+  if (distanceDiff !== 0) return distanceDiff
+  return String(a?.id || '').localeCompare(String(b?.id || ''))
+}
+const visibleRecommendations = computed(() => {
+  const items = [...recommendations.value]
+  const valueFor = (item, key) => {
+    if (key === 'score') return Number(item.score)
+    if (key === 'distance') return Number(item.metrics?.distanceMeters)
+    if (key === 'shade') return Number(item.metrics?.shadeCoverage)
+    if (key === 'time') return Number(item.metrics?.durationMinutes)
+    return Number.NaN
+  }
+
+  if (recommendationSort.value === 'distance-asc') {
+    return items.sort((a, b) => finite(valueFor(a, 'distance'), Infinity) - finite(valueFor(b, 'distance'), Infinity))
+  }
+  if (recommendationSort.value === 'shade-desc') {
+    return items.sort((a, b) => finite(valueFor(b, 'shade'), -Infinity) - finite(valueFor(a, 'shade'), -Infinity))
+  }
+  return items.sort(compareByScoreThenDistance)
+})
+const topRecommendationScore = computed(() => Math.max(...recommendations.value.map((item) => Number(item.score)).filter(Number.isFinite), -Infinity))
+const topRecommendationId = computed(() => {
+  const topRecommendation = recommendations.value
+    .filter((item) => Number.isFinite(recommendationScoreValue(item)))
+    .sort(compareByScoreThenDistance)[0]
+  return topRecommendation?.id || ''
+})
+const topShadeCoverage = computed(() => Math.max(...recommendations.value.map((item) => Number(item.metrics?.shadeCoverage)).filter(Number.isFinite), -Infinity))
 const destinationKind = computed(() => selectedType.value || result.destination?.type || selectedSpecificDestination.value?.type || '')
 const selectedTypeLabel = computed(() => destinationTypes.find((d) => d.id === selectedType.value)?.label || selectedSpecificDestination.value?.type || 'Destination')
 const selectedTypeIconUrl = computed(() => destinationTypes.find((d) => d.id === selectedType.value || d.id === selectedSpecificDestination.value?.type)?.icon || parkIcon)
@@ -741,10 +874,15 @@ const destinationReadyLabel = computed(() => {
 })
 const canFindRecommendations = computed(() => !!selectedStart.value && (destinationMode.value === 'specific' ? !!selectedSpecificDestination.value : !!selectedType.value))
 const currentStep = computed(() => {
-  if (isRouteView.value) return 5
-  if (isReadinessOpen.value) return 4
+  if (isRouteView.value || isReadinessOpen.value || isReadinessPromptOpen.value) return 4
   return visibleStep.value
 })
+const shadeMetric = computed(() => {
+  const v = result.metrics?.shadeCoverage
+  if (!Number.isFinite(v)) return null
+  return { value: Math.round(v * 100) }
+})
+
 const routeDistanceMeters = computed(() => Number.isFinite(result.metrics.distanceMeters) ? result.metrics.distanceMeters : 0)
 const distanceMetric = computed(() => routeDistanceMeters.value >= 1000
   ? { value: (routeDistanceMeters.value / 1000).toFixed(2), unit: 'km' }
@@ -752,6 +890,7 @@ const distanceMetric = computed(() => routeDistanceMeters.value >= 1000
 const walkMinutes = computed(() => Number.isFinite(result.metrics.durationMinutes) ? `${Math.max(1, Math.round(result.metrics.durationMinutes))}` : '--')
 const walkMetric = computed(() => ({ value: walkMinutes.value, unit: 'min' }))
 const facilityBreakdown = computed(() => {
+  if (!hasDestination.value && selectedRecommendation.value) return facilityBreakdownForRecommendation(selectedRecommendation.value)
   const output = { bench: 0, drinking_fountain: 0, toilet: 0 }
   Object.entries(result.facilitySummary || {}).forEach(([key, value]) => {
     if (output[key] !== undefined && Number.isFinite(Number(value))) output[key] = Number(value)
@@ -762,14 +901,95 @@ const facilityBreakdown = computed(() => {
   })
   return output
 })
+const detailFacilityBreakdown = computed(() => detailRecommendation.value ? facilityBreakdownForRecommendation(detailRecommendation.value) : { bench: 0, drinking_fountain: 0, toilet: 0 })
+const detailFacilitySummaryText = computed(() => {
+  const names = facilityTypeNames(detailFacilityBreakdown.value)
+  return names.length ? `You may pass ${names.join(', ')}.` : ''
+})
+const hasDetailFacilities = computed(() => Object.values(detailFacilityBreakdown.value).some((value) => value > 0))
+const hasDetailScore = computed(() => Number.isFinite(Number(detailRecommendation.value?.score)))
+const detailRatingLabel = computed(() => detailRecommendation.value?.ratingLabel || ratingLabelFromScore(detailRecommendation.value?.score))
+const detailScoreBreakdownRows = computed(() => {
+  const recommendation = detailRecommendation.value
+  const breakdown = recommendation?.scoreBreakdown || {}
+  const weights = breakdown.weights || {}
+  const rows = [
+    {
+      key: 'shade',
+      label: 'Shade',
+      value: Number(breakdown.shade),
+      max: Number(weights.shade ?? 45),
+      meta: Number.isFinite(Number(breakdown.shadeCoverage))
+        ? `${Math.round(Number(breakdown.shadeCoverage) * 100)}% tree shade coverage`
+        : 'Tree shade contribution'
+    },
+    {
+      key: 'facilities',
+      label: 'Facilities',
+      value: Number(breakdown.facilities),
+      max: Number(weights.facilities ?? 30),
+      meta: facilityCountText(breakdown)
+    },
+    {
+      key: 'distance',
+      label: 'Distance',
+      value: Number(breakdown.distance),
+      max: Number(weights.distance ?? 25),
+      meta: Number.isFinite(Number(breakdown.distanceMeters))
+        ? `${formatDistance(Number(breakdown.distanceMeters))} walking route`
+        : 'Shorter routes score higher'
+    }
+  ]
+  if (breakdown.slopeCoverage !== undefined && breakdown.slopeCoverage !== null) {
+    const slopeIncluded = Boolean(breakdown.slopeIncludedInScore)
+    const averageSlope = Number(breakdown.averageSlopePercent)
+    rows.push({
+      key: 'slope',
+      label: 'Slope',
+      value: Number(breakdown.slope),
+      max: Number(weights.slope ?? 15),
+      meta: slopeIncluded && Number.isFinite(averageSlope)
+        ? `${averageSlope.toFixed(1)}% average slope`
+        : 'Slope information limited for this route',
+      displayOverride: slopeIncluded ? '' : 'Not included'
+    })
+  }
+
+  return rows.map((row) => {
+    const value = Number.isFinite(row.value) ? row.value : 0
+    const max = Number.isFinite(row.max) && row.max > 0 ? row.max : 1
+    return {
+      ...row,
+      displayValue: row.displayOverride || `${formatScorePart(value)} / ${formatScorePart(max)}`,
+      percent: Math.max(0, Math.min(100, Math.round((value / max) * 100)))
+    }
+  })
+})
+const websiteHref = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  return /^https?:\/\//i.test(text) ? text : `https://${text}`
+}
+const detailInfoRows = computed(() => {
+  const destination = detailRecommendation.value?.destination || {}
+  return [
+    { key: 'address', label: 'Address', value: destination.address || '' },
+    { key: 'opening-hours', label: 'Opening hours', value: destination.openingHours || '' },
+    { key: 'website', label: 'Website', value: destination.website || '', href: websiteHref(destination.website) },
+    { key: 'phone', label: 'Phone', value: destination.phone || '' },
+    { key: 'wheelchair', label: 'Wheelchair access', value: destination.wheelchair || '' },
+    { key: 'cuisine', label: 'Cuisine', value: destination.cuisine || '' },
+    { key: 'brand', label: 'Brand', value: destination.brand || '' },
+    { key: 'operator', label: 'Operator', value: destination.operator || '' },
+    { key: 'last-updated', label: 'Last updated', value: destination.lastUpdated || '' },
+  ].filter((row) => String(row.value || '').trim())
+})
+const hasAnyFacility = computed(() => Object.values(facilityBreakdown.value).some((value) => value > 0))
 const routeComfortNotes = computed(() => result.comfortNotes.length ? result.comfortNotes : readinessRouteAlerts.value)
 const scoreBreakdownRows = computed(() => [
-  { key: 'distance', label: 'Distance and time', value: result.scoreBreakdown.distance ?? '--' },
-  { key: 'bench', label: 'Bench coverage', value: result.scoreBreakdown.bench ?? '--' },
-  { key: 'toilet', label: 'Toilet coverage', value: result.scoreBreakdown.toilet ?? '--' },
-  { key: 'drinking_fountain', label: 'Water access', value: result.scoreBreakdown.drinking_fountain ?? '--' },
   { key: 'shade', label: 'Shade', value: result.scoreBreakdown.shade ?? '--' },
-  { key: 'slope', label: 'Slope comfort', value: result.scoreBreakdown.slope ?? '--' }
+  { key: 'facilities', label: 'Facilities', value: result.scoreBreakdown.facilities ?? '--' },
+  { key: 'distance', label: 'Distance', value: result.scoreBreakdown.distance ?? '--' }
 ])
 const destinationChecklist = computed(() => destinationChecklistByType[destinationKind.value] || destinationChecklistByType.default)
 const destinationChecklistIntro = computed(() => destinationChecklist.value.intro)
@@ -832,7 +1052,7 @@ const weatherAdvice = computed(() => {
   }
 })
 const readinessRouteAlerts = computed(() => [
-  'This route can include backend comfort markers for benches, toilets, and drinking fountains.',
+  'This route may include comfort markers for benches, toilets, and drinking fountains.',
   'Tree canopy shade is displayed on the final route map when available.'
 ])
 const readinessResult = computed(() => {
@@ -843,10 +1063,28 @@ const routeInstructions = computed(() => result.instructions.length ? result.ins
   { text: `Follow the highlighted route to ${result.destination?.name || 'your destination'}.`, distanceMeters: result.metrics.distanceMeters },
   { text: 'Check the route notes before leaving.', distanceMeters: null }
 ])
-const canSeeRoute = computed(() => !!result.destination && result.route.length > 1)
+const canSeeRoute = computed(() => {
+  const option = selectedRecommendation.value
+  if (option) return option.route.length > 1
+  return !!result.destination && result.route.length > 1
+})
 const showMapShoppingList = computed(() => destinationKind.value === 'grocery' && shoppingItems.value.length > 0)
 
 const formatScore = (score) => Number.isFinite(Number(score)) ? `${Math.round(Number(score))}/100` : 'Score --'
+const formatCompactScore = (score) => Number.isFinite(Number(score)) ? `${Math.round(Number(score))}` : '--'
+const formatScorePart = (value) => {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '--'
+  return Number.isInteger(number) ? `${number}` : number.toFixed(1)
+}
+const ratingLabelFromScore = (score) => {
+  const value = Number(score)
+  if (!Number.isFinite(value)) return 'Not rated'
+  if (value >= 80) return 'Excellent'
+  if (value >= 68) return 'Good'
+  if (value >= 55) return 'Fair'
+  return 'Challenging'
+}
 const scoreTone = (score) => {
   const value = Number(score)
   if (value >= 80) return 'score-high'
@@ -859,7 +1097,107 @@ const formatDistance = (meters) => {
   if (!Number.isFinite(value)) return '-- m'
   return value >= 1000 ? `${(value / 1000).toFixed(2)} km` : `${Math.round(value)} m`
 }
-const firstComfortNote = (recommendation) => recommendation.comfortNotes?.[0] || 'Comfort score based on distance and route support'
+const friendlyErrorMessage = (fallback = 'Something went wrong. Please try again in a moment.') => fallback
+const friendlyServiceErrorMessage = () => 'The service is busy right now. Please try again in a moment.'
+const friendlySearchErrorMessage = () => 'Search is taking longer than expected. Please try again in a moment.'
+const facilityBreakdownForRecommendation = (recommendation) => {
+  const output = { bench: 0, drinking_fountain: 0, toilet: 0 }
+  Object.entries(recommendation?.facilitySummary || {}).forEach(([key, value]) => {
+    if (output[key] !== undefined && Number.isFinite(Number(value))) output[key] = Number(value)
+  })
+  if (Object.values(output).some((value) => value > 0)) return output
+  ;(recommendation?.facilities || []).forEach((item) => {
+    if (output[item.type] !== undefined) output[item.type] += 1
+  })
+  return output
+}
+const facilityTypeNames = (breakdown) => {
+  const names = []
+  if ((breakdown?.bench || 0) > 0) names.push('benches')
+  if ((breakdown?.toilet || 0) > 0) names.push('toilets')
+  if ((breakdown?.drinking_fountain || 0) > 0) names.push('drinking fountains')
+  return names
+}
+const facilityCountText = (breakdown) => {
+  const parts = []
+  const benches = Number(breakdown?.bench || 0)
+  const toilets = Number(breakdown?.toilet || 0)
+  const fountains = Number(breakdown?.drinking_fountain || 0)
+  if (benches > 0) parts.push(`${benches} bench${benches === 1 ? '' : 'es'}`)
+  if (toilets > 0) parts.push(`${toilets} toilet${toilets === 1 ? '' : 's'}`)
+  if (fountains > 0) parts.push(`${fountains} fountain${fountains === 1 ? '' : 's'}`)
+  return parts.length ? parts.join(', ') : 'No nearby facilities counted'
+}
+const recommendationSummaryNotes = (recommendation) => {
+  const notes = []
+  const breakdown = facilityBreakdownForRecommendation(recommendation)
+  const names = facilityTypeNames(breakdown)
+  if (names.length) notes.push(`Along the way: ${names.join(', ')}`)
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  if (Number.isFinite(shade)) notes.push(`${Math.round(shade * 100)}% tree shade`)
+  return notes
+}
+const isMostRecommended = (recommendation) => {
+  const score = Number(recommendation?.score)
+  return Number.isFinite(score)
+    && Number.isFinite(topRecommendationScore.value)
+    && recommendation?.id === topRecommendationId.value
+}
+const isBestShade = (recommendation) => {
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  return Number.isFinite(shade) && shade >= 0.2 && Number.isFinite(topShadeCoverage.value) && shade === topShadeCoverage.value
+}
+const shadeTierLabel = (recommendation) => {
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  if (!Number.isFinite(shade)) return ''
+  if (shade >= 0.65) return 'Best shade'
+  if (shade >= 0.4) return 'Shaded route'
+  if (shade >= 0.2) return 'Some shade'
+  return 'Limited shade'
+}
+const recommendationBadges = (recommendation) => {
+  const badges = []
+  if (isMostRecommended(recommendation)) {
+    badges.push({ label: 'Most Recommended', icon: 'material-symbols:star-rounded', tone: 'planner-rec-label-gold' })
+  }
+  if (isBestShade(recommendation)) {
+    badges.push({ label: 'Best shade', icon: 'material-symbols:eco', tone: 'planner-rec-label-green' })
+  }
+  return badges
+}
+const recommendationFeatureChips = (recommendation) => {
+  const chips = []
+  const shadeLabel = shadeTierLabel(recommendation)
+  if (shadeLabel) {
+    chips.push({
+      key: 'shade',
+      label: shadeLabel,
+      icon: 'material-symbols:park',
+      tone: shadeLabel === 'Limited shade' ? 'planner-chip-warm' : 'planner-chip-shade'
+    })
+  }
+
+  const breakdown = facilityBreakdownForRecommendation(recommendation)
+  if (breakdown.bench > 0) {
+    chips.push({ key: 'bench', label: `${breakdown.bench} Bench${breakdown.bench === 1 ? '' : 'es'}`, iconSrc: benchIcon, tone: 'planner-chip-bench' })
+  }
+  if (breakdown.drinking_fountain > 0) {
+    chips.push({ key: 'drinking_fountain', label: `${breakdown.drinking_fountain} Fountain${breakdown.drinking_fountain === 1 ? '' : 's'}`, iconSrc: fountainIcon, tone: 'planner-chip-fountain' })
+  }
+  if (breakdown.toilet > 0) {
+    chips.push({ key: 'toilet', label: `${breakdown.toilet} Toilet${breakdown.toilet === 1 ? '' : 's'}`, iconSrc: toiletIcon, tone: 'planner-chip-toilet' })
+  }
+  return chips
+}
+const recommendationShadeLabel = (recommendation) => {
+  const shade = Number(recommendation?.metrics?.shadeCoverage)
+  return Number.isFinite(shade) ? `${Math.round(shade * 100)}%` : 'Not available yet'
+}
+const recommendationTypeIconUrl = (recommendation) => {
+  const type = recommendation?.destination?.type || selectedType.value || selectedSpecificDestination.value?.type
+  return destinationTypes.find((item) => item.id === type)?.icon || selectedTypeIconUrl.value
+}
+const firstComfortNote = (recommendation) => recommendation.comfortNotes?.[0] || 'Comfort score based on walking time, shade, and nearby facilities'
 const scrollTo = (el) => el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 const unlockStep = (id) => {
   maxReachableStep.value = Math.max(maxReachableStep.value, id)
@@ -867,7 +1205,7 @@ const unlockStep = (id) => {
 const lockAfterStep = (id) => {
   maxReachableStep.value = Math.min(maxReachableStep.value, id)
 }
-const canNavigateToStep = (id) => id <= maxReachableStep.value
+const canNavigateToStep = (id) => id <= Math.min(maxReachableStep.value, 3)
 const showStep = async (id) => {
   visibleStep.value = id
   isReadinessOpen.value = false
@@ -985,18 +1323,105 @@ const inferDestinationType = (place) => {
   if (source.includes('park') || source.includes('garden')) return 'park'
   return ''
 }
+// Maps each backend POI category (from sqlite_service / OSM) to a Google
+// Material Symbols icon name + short human label. Iconify loads each named
+// icon on demand from the bundled material-symbols dataset.
+//
+// Browse / search icon names: https://fonts.google.com/icons (use the
+// snake_case → kebab-case conversion that iconify expects)
+const POI_CATEGORY_DISPLAY = {
+  // Transport
+  transit: { icon: 'material-symbols:train', label: 'Station' },
+  // Food / drink
+  cafe: { icon: 'material-symbols:local-cafe', label: 'Cafe' },
+  restaurant: { icon: 'material-symbols:restaurant', label: 'Restaurant' },
+  fast_food: { icon: 'material-symbols:fastfood', label: 'Fast food' },
+  pub: { icon: 'material-symbols:sports-bar', label: 'Pub' },
+  bar: { icon: 'material-symbols:local-bar', label: 'Bar' },
+  ice_cream: { icon: 'material-symbols:icecream', label: 'Ice cream' },
+  bakery: { icon: 'material-symbols:bakery-dining', label: 'Bakery' },
+  butcher: { icon: 'material-symbols:storefront', label: 'Butcher' },
+  greengrocer: { icon: 'material-symbols:grocery', label: 'Greengrocer' },
+  // Health
+  pharmacy: { icon: 'material-symbols:local-pharmacy', label: 'Pharmacy' },
+  hospital: { icon: 'material-symbols:local-hospital', label: 'Hospital' },
+  clinic: { icon: 'material-symbols:medical-services', label: 'Clinic' },
+  dentist: { icon: 'material-symbols:dentistry', label: 'Dentist' },
+  // Shops
+  supermarket: { icon: 'material-symbols:shopping-cart', label: 'Supermarket' },
+  convenience: { icon: 'material-symbols:storefront', label: 'Convenience' },
+  mall: { icon: 'material-symbols:local-mall', label: 'Mall' },
+  department_store: { icon: 'material-symbols:store', label: 'Department store' },
+  clothes: { icon: 'material-symbols:checkroom', label: 'Clothing' },
+  books: { icon: 'material-symbols:menu-book', label: 'Bookshop' },
+  electronics: { icon: 'material-symbols:devices', label: 'Electronics' },
+  hardware: { icon: 'material-symbols:hardware', label: 'Hardware' },
+  florist: { icon: 'material-symbols:local-florist', label: 'Florist' },
+  gift: { icon: 'material-symbols:redeem', label: 'Gift shop' },
+  market: { icon: 'material-symbols:storefront', label: 'Market' },
+  // Civic
+  library: { icon: 'material-symbols:local-library', label: 'Library' },
+  school: { icon: 'material-symbols:school', label: 'School' },
+  university: { icon: 'material-symbols:school', label: 'University' },
+  bank: { icon: 'material-symbols:account-balance', label: 'Bank' },
+  atm: { icon: 'material-symbols:local-atm', label: 'ATM' },
+  post_office: { icon: 'material-symbols:local-post-office', label: 'Post office' },
+  place_of_worship: { icon: 'material-symbols:church', label: 'Place of worship' },
+  community_centre: { icon: 'material-symbols:groups', label: 'Community centre' },
+  // Leisure
+  park: { icon: 'material-symbols:park', label: 'Park' },
+  playground: { icon: 'material-symbols:swing', label: 'Playground' },
+  fitness: { icon: 'material-symbols:fitness-center', label: 'Fitness centre' },
+  swimming_pool: { icon: 'material-symbols:pool', label: 'Pool' },
+  fountain: { icon: 'material-symbols:water-drop', label: 'Fountain' },
+  // Tourism / culture
+  attraction: { icon: 'material-symbols:attractions', label: 'Attraction' },
+  museum: { icon: 'material-symbols:museum', label: 'Museum' },
+  gallery: { icon: 'material-symbols:palette', label: 'Gallery' },
+  hotel: { icon: 'material-symbols:hotel', label: 'Hotel' },
+  viewpoint: { icon: 'material-symbols:landscape', label: 'Viewpoint' },
+  tourist_info: { icon: 'material-symbols:info', label: 'Tourist info' },
+  artwork: { icon: 'material-symbols:image', label: 'Artwork' },
+  cinema: { icon: 'material-symbols:movie', label: 'Cinema' },
+  theatre: { icon: 'material-symbols:theater-comedy', label: 'Theatre' },
+}
+
+const FALLBACK_CATEGORY_DISPLAY = { icon: 'material-symbols:location-on', label: 'Place' }
+
+const categoryDisplay = (place) =>
+  POI_CATEGORY_DISPLAY[place?.category] || FALLBACK_CATEGORY_DISPLAY
+
+const placeTagValue = (place, ...keys) => {
+  const tags = place?.tags && typeof place.tags === 'object' ? place.tags : {}
+  for (const key of keys) {
+    const value = place?.[key] ?? tags[key]
+    if (value !== undefined && value !== null && String(value).trim()) return String(value)
+  }
+  return ''
+}
+
 const normalisePlaceSearchResults = (payload) => Array.isArray(payload?.places)
   ? payload.places
     .map((place, index) => {
       const lat = Number(place.lat ?? place.latitude)
       const lng = Number(place.lng ?? place.longitude)
+      const categories = Array.isArray(place.categories) ? place.categories : []
       return {
         id: place.placeId || place.id || `${place.name || 'place'}-${lat}-${lng}-${index}`,
         placeId: place.placeId || place.id || null,
         name: place.name || 'Search result',
         address: place.address || place.formattedAddress || place.vicinity || '',
         type: inferDestinationType(place),
-        categories: Array.isArray(place.categories) ? place.categories : [],
+        category: categories[0] || place.resultType || '',
+        categories,
+        openingHours: placeTagValue(place, 'openingHours', 'opening_hours', 'hours'),
+        website: placeTagValue(place, 'website'),
+        phone: placeTagValue(place, 'phone'),
+        wheelchair: placeTagValue(place, 'wheelchair'),
+        cuisine: placeTagValue(place, 'cuisine'),
+        brand: placeTagValue(place, 'brand'),
+        operator: placeTagValue(place, 'operator'),
+        lastUpdated: placeTagValue(place, 'lastUpdated', 'last_updated', 'updatedAt', 'updated_at', 'timestamp'),
         lat,
         lng
       }
@@ -1007,9 +1432,12 @@ const searchPlaces = async (query) => {
   const response = await fetch(placeSearchEndpoint(query))
   const payload = await readJsonResponse(response)
   if (!response.ok) {
-    throw new Error(payload.error || payload.message || `Place search failed (${response.status})`)
+    throw new Error(friendlySearchErrorMessage())
   }
-  return normalisePlaceSearchResults(payload)
+  return {
+    places: normalisePlaceSearchResults(payload),
+    outOfAreaCount: Number(payload?.outOfAreaCount) || 0,
+  }
 }
 let weatherRequestKey = ''
 const weatherEndpoint = (place) => {
@@ -1032,13 +1460,13 @@ const loadWeatherForStart = async () => {
   try {
     const response = await fetch(weatherEndpoint(place))
     const payload = await readJsonResponse(response)
-    if (!response.ok) throw new Error(payload.reason || payload.error || `Weather request failed (${response.status})`)
+    if (!response.ok) throw new Error('Weather advice is not available right now.')
     weather.current = payload.current || null
     weather.daily = payload.daily || null
   } catch (error) {
     weather.current = null
     weather.daily = null
-    weather.error = error instanceof Error ? error.message : 'Weather request failed.'
+    weather.error = 'Weather advice is not available right now.'
   } finally {
     weather.isLoading = false
   }
@@ -1061,7 +1489,15 @@ const normaliseBackendDestination = (destination, fallback = {}) => {
     placeId: destination?.placeId || fallback.placeId || null,
     name: destination?.name || fallback.name || 'Recommended destination',
     type,
-    address: destination?.address || destination?.vicinity || destination?.formatted || fallback.address || selectedTypeLabel.value,
+    address: destination?.address || destination?.vicinity || destination?.formatted || fallback.address || '',
+    openingHours: destination?.openingHours || destination?.opening_hours || destination?.hours || fallback.openingHours || '',
+    website: destination?.website || fallback.website || '',
+    phone: destination?.phone || fallback.phone || '',
+    wheelchair: destination?.wheelchair || fallback.wheelchair || '',
+    cuisine: destination?.cuisine || fallback.cuisine || '',
+    brand: destination?.brand || fallback.brand || '',
+    operator: destination?.operator || fallback.operator || '',
+    lastUpdated: destination?.lastUpdated || destination?.last_updated || destination?.updatedAt || destination?.updated_at || fallback.lastUpdated || '',
     lat,
     lng
   }
@@ -1091,12 +1527,13 @@ const buildBackendComfortNotes = (facilities, routeSummary) => {
   const benches = facilities.filter((item) => item.type === 'bench').length
   const toilets = facilities.filter((item) => item.type === 'toilet').length
   const fountains = facilities.filter((item) => item.type === 'drinking_fountain').length
-  if (benches) notes.push(`${benches} rest stop${benches === 1 ? '' : 's'} along the route`)
-  if (toilets) notes.push(`${toilets} toilet${toilets === 1 ? '' : 's'} nearby`)
-  if (fountains) notes.push(`${fountains} drinking fountain${fountains === 1 ? '' : 's'} nearby`)
-  if (!notes.length) notes.push('No route-support facilities returned nearby')
-  const distance = Number(routeSummary?.walkingDistanceMeters)
-  if (Number.isFinite(distance)) notes.push(`${formatDistance(distance)} backend walking route`)
+  const names = []
+  if (benches) names.push('benches')
+  if (toilets) names.push('toilets')
+  if (fountains) names.push('drinking fountains')
+  if (names.length) notes.push(`Along the way: ${names.join(', ')}`)
+  const shade = Number(routeSummary?.shadeCoverage)
+  if (Number.isFinite(shade)) notes.push(`${Math.round(shade * 100)}% tree shade`)
   return notes
 }
 const buildBackendRecommendation = (payload, index = 0) => {
@@ -1115,9 +1552,14 @@ const buildBackendRecommendation = (payload, index = 0) => {
     facilitySummary: payload.facilitySummary || {},
     metrics: {
       distanceMeters: Number.isFinite(distanceMeters) ? distanceMeters : null,
-      durationMinutes: Number.isFinite(durationMinutes) ? durationMinutes : null
+      durationMinutes: Number.isFinite(durationMinutes) ? durationMinutes : null,
+      shadeCoverage: Number.isFinite(Number(routeSummary.shadeCoverage)) ? Number(routeSummary.shadeCoverage) : null,
+      preferShade: Boolean(routeSummary.preferShade)
     },
     score: Number.isFinite(Number(payload.score)) ? Number(payload.score) : null,
+    routeRating: Number.isFinite(Number(payload.routeRating)) ? Number(payload.routeRating) : null,
+    ratingLabel: payload.ratingLabel || '',
+    ratingReason: payload.ratingReason || '',
     scoreBreakdown: payload.scoreBreakdown || {},
     comfortNotes: buildBackendComfortNotes(facilities, routeSummary),
     instructions: []
@@ -1157,12 +1599,14 @@ const fetchBackendPlan = async () => {
           name: selectedSpecificDestination.value.name,
           lat: selectedSpecificDestination.value.lat,
           lng: selectedSpecificDestination.value.lng
-        }
+        },
+        preferShade: preferShade.value
       }
     : {
         mode: 'destination_type',
         start,
-        destinationType: selectedType.value
+        destinationType: selectedType.value,
+        preferShade: preferShade.value
       }
   const response = await fetch(routePlanEndpoint(), {
     method: 'POST',
@@ -1170,7 +1614,7 @@ const fetchBackendPlan = async () => {
   })
   const payload = await readJsonResponse(response)
   if (!response.ok) {
-    throw new Error(payload.error || payload.message || `Route planner request failed (${response.status})`)
+    throw new Error(friendlyServiceErrorMessage())
   }
   return payload
 }
@@ -1210,11 +1654,18 @@ const runStartSearch = async () => {
   isSearchingStart.value = true
   startValidationMessage.value = ''
   try {
-    startSearchResults.value = await searchPlaces(startQuery.value)
-    if (!startSearchResults.value.length) startValidationMessage.value = 'No matching places were returned. Try a more specific address or landmark.'
+    const result = await searchPlaces(startQuery.value)
+    startSearchResults.value = result.places
+    startOutOfAreaCount.value = result.outOfAreaCount
+    if (!result.places.length) {
+      startValidationMessage.value = result.outOfAreaCount > 0
+        ? 'No matches in Central Melbourne. Try a closer place or a more specific address.'
+        : 'No matching places were returned. Try a more specific address or landmark.'
+    }
   } catch (error) {
     startSearchResults.value = []
-    startValidationMessage.value = error instanceof Error ? error.message : 'Place search failed.'
+    startOutOfAreaCount.value = 0
+    startValidationMessage.value = friendlySearchErrorMessage()
   } finally {
     isSearchingStart.value = false
   }
@@ -1243,15 +1694,60 @@ const runDestinationSearch = async () => {
   isSearchingDestination.value = true
   destinationValidationMessage.value = ''
   try {
-    destinationSearchResults.value = await searchPlaces(destinationQuery.value)
-    if (!destinationSearchResults.value.length) destinationValidationMessage.value = 'No matching destinations were returned. Try a more specific place name.'
+    const result = await searchPlaces(destinationQuery.value)
+    destinationSearchResults.value = result.places
+    destinationOutOfAreaCount.value = result.outOfAreaCount
+    if (!result.places.length) {
+      destinationValidationMessage.value = result.outOfAreaCount > 0
+        ? 'No matches in Central Melbourne. Try a closer place or a more specific place name.'
+        : 'No matching destinations were returned. Try a more specific place name.'
+    }
   } catch (error) {
     destinationSearchResults.value = []
-    destinationValidationMessage.value = error instanceof Error ? error.message : 'Destination search failed.'
+    destinationOutOfAreaCount.value = 0
+    destinationValidationMessage.value = friendlySearchErrorMessage()
   } finally {
     isSearchingDestination.value = false
   }
 }
+
+const SEARCH_DEBOUNCE_MS = 400
+const SEARCH_MIN_CHARS = 3
+let startSearchDebounce = null
+let destinationSearchDebounce = null
+
+watch(startQuery, (value) => {
+  if (startSearchDebounce) {
+    clearTimeout(startSearchDebounce)
+    startSearchDebounce = null
+  }
+  if (!value || value.trim().length < SEARCH_MIN_CHARS) {
+    startSearchResults.value = []
+    return
+  }
+  startSearchDebounce = setTimeout(() => {
+    runStartSearch()
+  }, SEARCH_DEBOUNCE_MS)
+})
+
+watch(destinationQuery, (value) => {
+  if (destinationSearchDebounce) {
+    clearTimeout(destinationSearchDebounce)
+    destinationSearchDebounce = null
+  }
+  if (!value || value.trim().length < SEARCH_MIN_CHARS) {
+    destinationSearchResults.value = []
+    return
+  }
+  destinationSearchDebounce = setTimeout(() => {
+    runDestinationSearch()
+  }, SEARCH_DEBOUNCE_MS)
+})
+
+onBeforeUnmount(() => {
+  if (startSearchDebounce) clearTimeout(startSearchDebounce)
+  if (destinationSearchDebounce) clearTimeout(destinationSearchDebounce)
+})
 const selectSpecificDestination = async (place) => {
   if (samePlace(selectedSpecificDestination.value, place)) return
   destinationValidationMessage.value = ''
@@ -1280,6 +1776,9 @@ const clearPlanOnly = () => {
     route: [],
     metrics: { distanceMeters: null, durationMinutes: null },
     score: null,
+    routeRating: null,
+    ratingLabel: '',
+    ratingReason: '',
     scoreBreakdown: {},
     facilitySummary: {},
     canopy: null,
@@ -1313,7 +1812,7 @@ const requestPlan = async () => {
   try {
     const payload = await fetchBackendPlan()
     if (payload?.eligible === false) {
-      planError.value = payload.message || 'This route is outside the supported walking range.'
+      planError.value = 'This route is outside our current walking range.'
       recommendations.value = []
     } else {
       const backendRecommendations = buildRecommendationsFromPayload(payload)
@@ -1322,12 +1821,13 @@ const requestPlan = async () => {
         if (await isPlaceInSupportedArea(recommendation.destination)) supportedRecommendations.push(recommendation)
       }
       if (!supportedRecommendations.length) {
-        planError.value = payload.message || 'No suitable route option was returned.'
+        planError.value = 'We could not find a suitable walking option for this start point and destination.'
       }
       recommendations.value = supportedRecommendations
+      highlightedRecommendationId.value = visibleRecommendations.value[0]?.id || ''
     }
   } catch (error) {
-    planError.value = error instanceof Error ? error.message : 'Route planner request failed.'
+    planError.value = friendlyServiceErrorMessage()
     recommendations.value = []
   } finally {
     isLoadingPlan.value = false
@@ -1377,6 +1877,9 @@ const applySelectedRecommendation = (recommendation) => {
     route: recommendation?.route || [],
     metrics: recommendation?.metrics || { distanceMeters: null, durationMinutes: null },
     score: recommendation?.score ?? null,
+    routeRating: recommendation?.routeRating ?? null,
+    ratingLabel: recommendation?.ratingLabel || '',
+    ratingReason: recommendation?.ratingReason || '',
     scoreBreakdown: recommendation?.scoreBreakdown || {},
     facilitySummary: recommendation?.facilitySummary || {},
     canopy: null,
@@ -1403,6 +1906,13 @@ const selectRecommendation = async (recommendation) => {
   loadCanopyForRoute(recommendation?.route || [])
   scrollTo(resultsSectionEl.value)
 }
+const openRecommendationDetails = (recommendation) => {
+  highlightedRecommendationId.value = recommendation?.id || ''
+  isDetailOpen.value = true
+}
+const closeRecommendationDetails = () => {
+  isDetailOpen.value = false
+}
 const backToRecommendations = async () => {
   applySelectedRecommendation(null)
   lockAfterStep(3)
@@ -1414,7 +1924,7 @@ const backToRecommendations = async () => {
 const highlightRecommendation = async (recommendation) => {
   highlightedRecommendationId.value = recommendation?.id || ''
   await nextTick()
-  drawMiniMap()
+  drawMiniMap({ focusSelected: true })
 }
 
 const loadBoundaryGeoJson = async () => {
@@ -1478,7 +1988,7 @@ const loadMapStyle = async () => {
             url: `pmtiles://${PMTILES_URL}`,
             minzoom: 0,
             maxzoom: PMTILES_MAX_DATA_ZOOM,
-            bounds: [144.266, -38.552, 145.81, -37.365]
+            bounds: [144.875, -37.895, 145.055, -37.735]
           }
         }
       }))
@@ -1756,6 +2266,8 @@ const clearMarkers = (markers) => {
 const addHtmlMarker = (targetMap, markers, lngLat, html, options = {}) => {
   const el = document.createElement('div')
   el.className = 'planner-maplibre-marker'
+  if (options.className) el.classList.add(options.className)
+  if (options.zIndex != null) el.style.zIndex = String(options.zIndex)
   el.innerHTML = html
   const marker = new maplibregl.Marker({
     element: el,
@@ -1928,13 +2440,30 @@ const drawCanopyLayer = (targetMap, sourceId) => {
     console.error('[Shadeo draw canopy failed]', error)
   }
 }
-const fitMapToPoints = (targetMap, lngLatPoints, padding) => {
+const fitMapToPoints = (targetMap, lngLatPoints, padding, maxZoom = MAP_MAX_ZOOM) => {
   if (!targetMap || !lngLatPoints.length) return
   const bounds = lngLatPoints.reduce(
     (mapBounds, point) => mapBounds.extend(point),
     new maplibregl.LngLatBounds(lngLatPoints[0], lngLatPoints[0])
   )
-  targetMap.fitBounds(bounds, { padding, maxZoom: MAP_MAX_ZOOM, duration: 0 })
+  targetMap.fitBounds(bounds, { padding, maxZoom, duration: 0 })
+}
+const maxCoordinateSpan = (lngLatPoints) => {
+  if (!lngLatPoints.length) return 0
+  const lngs = lngLatPoints.map((point) => Number(point[0])).filter(Number.isFinite)
+  const lats = lngLatPoints.map((point) => Number(point[1])).filter(Number.isFinite)
+  if (!lngs.length || !lats.length) return 0
+  return Math.max(
+    Math.max(...lngs) - Math.min(...lngs),
+    Math.max(...lats) - Math.min(...lats)
+  )
+}
+const miniMapFitMaxZoom = (lngLatPoints) => {
+  const span = maxCoordinateSpan(lngLatPoints)
+  if (span <= 0.003) return 15.9
+  if (span <= 0.006) return 15.5
+  if (span <= 0.012) return 15
+  return 14.2
 }
 const drawRouteLine = (targetMap, sourceId, lngLatLine) => {
   if (DEBUG_PLANNER && sourceId === 'planner-route') {
@@ -1998,19 +2527,30 @@ const drawMarkerSet = (targetMap, markers, lngLatBounds, includeFacilities = fal
     targetMap,
     markers,
     [start.lng, start.lat],
-    includeFacilities ? startMarkerHtml() : '<div class="rv-pin-start"></div><div class="rv-pin-label rv-pin-label-start">Start</div>'
+    includeFacilities ? startMarkerHtml() : '<div class="rv-pin-start"></div><div class="rv-pin-label rv-pin-label-start">Start</div>',
+    { zIndex: 20 }
   )
   lngLatBounds.push([start.lng, start.lat])
 
-  const destinations = hasDestination.value ? [result] : recommendations.value
-  destinations.forEach((item, index) => {
+  const destinations = (targetMap === miniMap && visibleRecommendations.value.length
+    ? visibleRecommendations.value
+    : hasDestination.value ? [result] : recommendations.value)
+    .map((item, index) => ({ item, index }))
+  const orderedDestinations = [
+    ...destinations.filter(({ item }) => !(!hasDestination.value && highlightedRecommendationId.value === item.id)),
+    ...destinations.filter(({ item }) => !hasDestination.value && highlightedRecommendationId.value === item.id)
+  ]
+  orderedDestinations.forEach(({ item, index }) => {
     const destination = item.destination
     const isHighlighted = !hasDestination.value && highlightedRecommendationId.value === item.id
     const pinClass = isHighlighted ? 'rv-pin-dest is-highlighted' : 'rv-pin-dest'
     const destHtml = hasDestination.value
       ? destinationMarkerHtml(selectedTypeLabel.value)
       : `<div class="${pinClass}">${index + 1}</div><div class="rv-pin-label rv-pin-label-dest">${destination.name}</div>`
-    addHtmlMarker(targetMap, markers, [destination.lng, destination.lat], destHtml)
+    addHtmlMarker(targetMap, markers, [destination.lng, destination.lat], destHtml, {
+      className: isHighlighted ? 'planner-marker-highlighted' : '',
+      zIndex: isHighlighted ? 80 : hasDestination.value ? 50 : 30 + index
+    })
     lngLatBounds.push([destination.lng, destination.lat])
   })
 
@@ -2031,13 +2571,29 @@ const ensureMiniMap = async () => {
   miniMap = await createPlannerMap(miniMapEl.value, { zoom: 13, onLoad: drawMiniMap })
   miniMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 }
-const drawMiniMap = async () => {
+const drawMiniMap = async (options = {}) => {
   if (!recommendations.value.length && !hasDestination.value) return
   await ensureMiniMap()
   if (!miniMap?.isStyleLoaded()) return
+  const focusSelected = options?.focusSelected === true
   const lngLatBounds = []
   drawMarkerSet(miniMap, miniMapMarkers, lngLatBounds, false)
-  fitMapToPoints(miniMap, lngLatBounds, 34)
+  const focusedDestination = selectedRecommendation.value?.destination
+  if (focusSelected && focusedDestination && Number.isFinite(Number(focusedDestination.lng)) && Number.isFinite(Number(focusedDestination.lat))) {
+    miniMap.easeTo({
+      center: [focusedDestination.lng, focusedDestination.lat],
+      zoom: Math.min(MAP_MAX_ZOOM, 16.8),
+      padding: { top: 0, bottom: 0, left: 0, right: 0 },
+      duration: 260
+    })
+  } else {
+    fitMapToPoints(
+      miniMap,
+      lngLatBounds,
+      { top: 44, bottom: 58, left: 44, right: 44 },
+      miniMapFitMaxZoom(lngLatBounds)
+    )
+  }
   requestAnimationFrame(() => miniMap?.resize())
 }
 const destroyMiniMap = () => {
@@ -2099,8 +2655,29 @@ const openReadinessCheck = () => {
   if (!hasDestination.value) return
   unlockStep(4)
   destroyMiniMap()
+  isReadinessPromptOpen.value = false
   isReadinessOpen.value = true
   loadWeatherForStart()
+}
+const openRouteReadinessPrompt = () => {
+  const recommendation = selectedRecommendation.value
+  if (!recommendation) return
+  applySelectedRecommendation(recommendation)
+  loadCanopyForRoute(recommendation.route || [])
+  unlockStep(4)
+  isDetailOpen.value = false
+  isReadinessPromptOpen.value = true
+}
+const readReadinessChecklist = () => {
+  if (!hasDestination.value) return
+  isReadinessPromptOpen.value = false
+  isReadinessOpen.value = true
+  destroyMiniMap()
+  loadWeatherForStart()
+}
+const skipReadinessAndOpenRoute = async () => {
+  isReadinessPromptOpen.value = false
+  await confirmReadyToGo()
 }
 const closeReadinessToResults = async () => {
   isReadinessOpen.value = false
@@ -2116,8 +2693,9 @@ const closeReadinessToResults = async () => {
 }
 const confirmReadyToGo = async () => {
   if (!hasDestination.value) return
+  isReadinessPromptOpen.value = false
   isReadinessOpen.value = false
-  unlockStep(5)
+  unlockStep(4)
   isRouteView.value = true
   window.scrollTo(0, 0)
   await nextTick()
@@ -2161,6 +2739,10 @@ const jumpToStep = async (id) => {
 }
 
 watch(hasDestination, async () => {
+  await nextTick()
+  drawMiniMap()
+})
+watch(recommendationSort, async () => {
   await nextTick()
   drawMiniMap()
 })
@@ -2233,9 +2815,9 @@ onBeforeUnmount(() => {
 .planner-step-nav {
   position: fixed;
   top: 50%;
-  right: clamp(16px, 2.8vw, 44px);
+  left: clamp(14px, 1.6vw, 28px);
   z-index: 40;
-  width: 190px;
+  width: 168px;
   margin: 0;
   transform: translateY(-50%);
   display: grid;
@@ -2272,9 +2854,14 @@ onBeforeUnmount(() => {
 
 .planner-step-nav button.active,
 .planner-step-nav button.done {
-  background: var(--brand-lime);
-  color: #142016;
-  border-color: transparent;
+  background: #263028;
+  color: #fff;
+  border-color: rgba(35, 45, 39, 0.18);
+}
+
+.planner-step-nav button.done {
+  background: #f2d28a;
+  color: #2b2415;
 }
 
 .planner-step-nav button.locked {
@@ -2306,8 +2893,8 @@ onBeforeUnmount(() => {
 
 @media (min-width: 1180px) {
   .planner-shell {
-    width: min(calc(100% - var(--gutter) * 2 - 230px), 1080px);
-    margin-left: max(var(--gutter), calc((100vw - 1320px) / 2));
+    width: min(calc(100% - 230px - var(--gutter)), 1280px);
+    margin-left: max(210px, calc((100vw - 1280px) / 2 + 80px));
     margin-right: auto;
   }
 }
@@ -2385,8 +2972,8 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: var(--brand-lime);
-  color: #142016;
+  background: #f2d28a;
+  color: #2b2415;
   font-size: 1.45rem;
   font-weight: 950;
 }
@@ -2430,6 +3017,11 @@ onBeforeUnmount(() => {
 .rv-legend-list {
   display: grid;
   gap: 12px;
+}
+
+.planner-route-panel .rv-legend-list {
+  grid-template-columns: 1fr;
+  gap: 5px;
 }
 
 .planner-choice-list,
@@ -2479,8 +3071,8 @@ onBeforeUnmount(() => {
 .planner-destination-card.is-selected,
 .planner-type-card:hover,
 .planner-type-card.active {
-  border-color: rgba(35, 45, 39, 0.22);
-  background: rgba(228, 248, 213, 0.78);
+  border-color: rgba(159, 100, 22, 0.34);
+  background: rgba(255, 239, 196, 0.82);
 }
 
 .planner-choice-icon,
@@ -2493,7 +3085,13 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: rgba(155, 224, 111, 0.24);
+  background: rgba(168, 212, 226, 0.28);
+}
+
+.planner-type-icon svg {
+  width: 32px;
+  height: 32px;
+  color: rgb(70, 100, 130);
 }
 
 .planner-choice-icon img,
@@ -2525,6 +3123,115 @@ onBeforeUnmount(() => {
   color: var(--brand-ink-muted);
   font-size: 1rem;
   line-height: 1.45;
+}
+
+.planner-search-hint {
+  margin: 8px 4px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(180, 180, 180, 0.08);
+  color: var(--brand-ink-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.planner-shade-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(168, 212, 226, 0.16);
+  border: 1px solid rgba(78, 130, 146, 0.26);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.planner-shade-toggle:hover {
+  background: rgba(168, 212, 226, 0.24);
+  border-color: rgba(78, 130, 146, 0.45);
+}
+
+.planner-shade-toggle input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4e8292;
+}
+
+.planner-shade-toggle-icon {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  color: #4e8292;
+}
+
+.planner-shade-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.planner-shade-toggle-text strong {
+  color: var(--brand-ink-soft);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.planner-shade-toggle-text small {
+  color: var(--brand-ink-muted);
+  font-size: 0.8rem;
+}
+
+.planner-metric-chip-shade {
+  background: rgba(168, 212, 226, 0.16);
+  color: #315c69;
+}
+
+.planner-metric-chip-shade svg {
+  width: 18px;
+  height: 18px;
+  color: #4e8292;
+}
+
+.planner-search-results button {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.planner-search-result-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  color: var(--brand-ink-soft);
+  /* Iconify renders SVG inline; this sets stroke / fill via currentColor */
+}
+
+.planner-search-result-text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.planner-search-result-tag {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(120, 180, 120, 0.18);
+  color: var(--brand-ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .planner-search-box {
@@ -2583,9 +3290,9 @@ onBeforeUnmount(() => {
 .planner-ready-btn,
 .planner-view-details,
 .planner-shopping-form button {
-  border-color: transparent;
-  background: var(--brand-lime);
-  color: #142016;
+  border-color: #263028;
+  background: #263028;
+  color: #fff;
 }
 
 .planner-back-btn,
@@ -2669,7 +3376,7 @@ onBeforeUnmount(() => {
   width: fit-content;
   padding: 12px 16px;
   border-radius: 16px;
-  background: rgba(155, 224, 111, 0.2);
+  background: rgba(255, 239, 196, 0.82);
 }
 
 .planner-selection-note-error {
@@ -2710,9 +3417,9 @@ onBeforeUnmount(() => {
 }
 
 .planner-recommendation-layout {
-  padding: clamp(18px, 3vw, 26px);
+  padding: clamp(18px, 2.4vw, 24px);
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+  grid-template-columns: minmax(430px, 0.95fr) minmax(440px, 1.05fr);
   gap: 18px;
   align-items: stretch;
 }
@@ -2727,14 +3434,42 @@ onBeforeUnmount(() => {
   font-size: clamp(1.75rem, 2.6vw, 2.4rem);
 }
 
+.planner-result-toolbar {
+  margin-bottom: 2px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.planner-result-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--brand-ink-soft);
+  font-size: 0.98rem;
+  font-weight: 1000;
+}
+
+.planner-result-toolbar select {
+  min-height: 38px;
+  border: 1px solid var(--brand-line-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--brand-ink-soft);
+  padding: 0 34px 0 12px;
+  font-weight: 900;
+}
+
 .planner-destination-card {
   cursor: pointer;
   align-items: flex-start;
+  padding: 14px 16px;
+  gap: 12px;
 }
 
 .planner-destination-card.is-top-result {
-  background: rgba(255, 255, 255, 0.64);
-  border-color: rgba(239, 166, 43, 0.28);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 224, 0.78));
+  border-color: rgba(239, 166, 43, 0.54);
+  box-shadow: 0 18px 42px -34px rgba(159, 100, 22, 0.7);
 }
 
 .planner-destination-rank {
@@ -2746,13 +3481,18 @@ onBeforeUnmount(() => {
   place-items: center;
   background: #263028;
   color: #fff;
+  font-size: 1rem;
   font-weight: 950;
 }
 
 .planner-destination-body {
+  flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 5px;
+  align-items: start;
 }
 
 .planner-destination-topline,
@@ -2760,6 +3500,7 @@ onBeforeUnmount(() => {
 .planner-tag-row,
 .planner-metric-row,
 .planner-summary-actions,
+.planner-result-actions,
 .rv-stats-row {
   display: flex;
   align-items: center;
@@ -2767,11 +3508,39 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.planner-destination-topline {
+  grid-column: 1 / -1;
+}
+
+.planner-result-actions {
+  margin-top: 10px;
+  justify-content: flex-start;
+}
+
+.planner-result-actions .btn {
+  min-width: 148px;
+}
+
+.planner-destination-main {
+  grid-column: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.planner-destination-main strong {
+  color: var(--brand-ink-soft);
+  font-size: clamp(1.18rem, 1.65vw, 1.52rem);
+  font-weight: 950;
+  line-height: 1.14;
+  overflow-wrap: anywhere;
+}
+
 .planner-rec-label,
 .planner-score-badge,
 .planner-tag-row em {
   border-radius: var(--r-pill);
-  padding: 7px 10px;
+  padding: 6px 10px;
   background: rgba(35, 45, 39, 0.08);
   color: var(--brand-ink-soft);
   font-size: 0.82rem;
@@ -2780,17 +3549,130 @@ onBeforeUnmount(() => {
   line-height: 1;
 }
 
+.planner-rec-label,
+.planner-tag-row em,
+.planner-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.planner-rec-label svg,
+.planner-tag-row em svg {
+  width: 16px;
+  height: 16px;
+}
+
+.planner-rec-label-gold {
+  background: linear-gradient(90deg, #fff1c8, #f5cf7c);
+  color: #6d4a13;
+}
+
+.planner-rec-label-green {
+  background: #e7f1df;
+  color: #3e6b3f;
+}
+
+.planner-card-score {
+  grid-column: 2;
+  grid-row: 2 / span 3;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+}
+
+.planner-destination-metrics,
+.planner-feature-chip-row {
+  grid-column: 1;
+}
+
+.planner-view-details {
+  grid-column: 1 / -1;
+}
+
+.planner-card-score > span:first-child {
+  width: 86px;
+  color: var(--brand-ink-soft);
+  font-size: 0.7rem;
+  font-weight: 1000;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.planner-score-badge-large {
+  width: 86px;
+  min-height: 58px;
+  align-self: start;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.planner-score-badge-large strong {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.planner-score-badge-large small {
+  color: inherit;
+  font-size: 0.76rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
 .planner-score-badge.score-high {
-  background: var(--brand-lime);
+  background: rgba(153, 207, 149, 0.32);
+  color: #2e6337;
 }
 
 .planner-score-badge.score-medium {
-  background: var(--brand-gold);
+  background: rgba(239, 166, 43, 0.2);
+  color: #7a5718;
 }
 
 .planner-score-badge.score-low {
   background: rgba(215, 114, 82, 0.18);
   color: #7b3426;
+}
+
+.planner-feature-chip-row em {
+  min-height: 31px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.planner-feature-chip-row img {
+  width: 18px;
+  height: 18px;
+}
+
+.planner-chip-shade {
+  background: #e9f3e4;
+  color: #3f693c;
+}
+
+.planner-chip-warm {
+  background: rgba(239, 166, 43, 0.18);
+  color: #735018;
+}
+
+.planner-chip-bench {
+  background: #f2eddf;
+  color: #62512d;
+}
+
+.planner-chip-fountain {
+  background: #e4f3f6;
+  color: #2d6570;
+}
+
+.planner-chip-toilet {
+  background: #e7eef8;
+  color: #345c83;
 }
 
 .planner-destination-metrics span,
@@ -2833,6 +3715,215 @@ onBeforeUnmount(() => {
 
 .planner-mini-map {
   min-height: 460px;
+}
+
+.planner-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+  padding: clamp(16px, 4vw, 34px);
+  display: grid;
+  place-items: center;
+  background: rgba(16, 19, 15, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.planner-detail-modal {
+  position: relative;
+  width: min(100%, 720px);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  padding: clamp(22px, 4vw, 34px);
+}
+
+.planner-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--brand-line);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--brand-ink-soft);
+  font-weight: 950;
+}
+
+.planner-detail-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.planner-detail-grid .planner-metric-chip {
+  justify-content: center;
+}
+
+.planner-destination-metrics {
+  margin-top: 0;
+}
+
+.planner-feature-chip-row {
+  margin-top: -1px;
+}
+
+.planner-detail-rating {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--brand-line-soft);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+  display: grid;
+  gap: 14px;
+}
+
+.planner-detail-rating-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.planner-detail-rating-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.planner-detail-rating-head span,
+.planner-score-row small {
+  color: var(--brand-ink-muted);
+  font-size: 0.98rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.planner-detail-rating-head span {
+  font-size: 0.82rem;
+}
+
+.planner-detail-rating-head strong {
+  color: var(--brand-ink-soft);
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.planner-detail-rating-head em {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  display: inline-flex;
+  align-items: center;
+  background: rgba(35, 45, 39, 0.08);
+  color: var(--brand-ink-soft);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.planner-detail-rating.score-high .planner-detail-rating-head em {
+  background: rgba(168, 212, 226, 0.38);
+  color: #254f5d;
+}
+
+.planner-detail-rating.score-medium .planner-detail-rating-head em {
+  background: var(--brand-gold);
+}
+
+.planner-detail-rating.score-low .planner-detail-rating-head em {
+  background: rgba(215, 114, 82, 0.18);
+  color: #7b3426;
+}
+
+.planner-detail-rating p {
+  margin: 0;
+  color: var(--brand-ink-muted);
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.planner-score-breakdown {
+  display: grid;
+  gap: 12px;
+}
+
+.planner-score-row {
+  display: grid;
+  gap: 6px;
+}
+
+.planner-score-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planner-score-row-top span,
+.planner-score-row-top strong {
+  color: var(--brand-ink-soft);
+  font-weight: 950;
+}
+
+.planner-score-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: rgba(35, 45, 39, 0.08);
+}
+
+.planner-score-bar span {
+  height: 100%;
+  border-radius: inherit;
+  display: block;
+  background: #5f9f73;
+}
+
+.planner-score-row:nth-child(2) .planner-score-bar span {
+  background: #6b95a8;
+}
+
+.planner-score-row:nth-child(3) .planner-score-bar span {
+  background: #d69b3a;
+}
+
+.planner-detail-info-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.planner-detail-info-list > div {
+  display: grid;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 1px solid var(--brand-line-soft);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.planner-detail-info-list strong {
+  color: var(--brand-ink-soft);
+  font-weight: 950;
+}
+
+.planner-detail-info-list span,
+.planner-detail-info-list a {
+  color: var(--brand-ink-muted);
+  font-weight: 700;
+  line-height: 1.4;
+  min-height: 1.4em;
+  overflow-wrap: anywhere;
+}
+
+.planner-detail-info-list a {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.planner-detail-facility-grid {
+  margin-top: 14px;
 }
 
 .planner-detail-layout {
@@ -2888,10 +3979,41 @@ onBeforeUnmount(() => {
 }
 
 .planner-readiness-modal {
+  position: relative;
   width: min(100%, 880px);
   max-height: min(92vh, 980px);
   overflow: auto;
   padding: clamp(22px, 4vw, 36px);
+}
+
+.planner-readiness-prompt {
+  width: min(100%, 760px);
+  overflow: auto;
+  padding: clamp(28px, 4vw, 40px);
+}
+
+.planner-readiness-prompt .planner-readiness-head h2 {
+  max-width: 13ch;
+  font-size: clamp(2.15rem, 5vw, 3.6rem);
+  line-height: 1.08;
+}
+
+.planner-readiness-prompt .planner-readiness-advice {
+  margin-top: 22px;
+  padding: 18px 22px;
+  font-size: clamp(1.05rem, 2vw, 1.28rem);
+  line-height: 1.55;
+}
+
+.planner-prompt-actions {
+  justify-content: flex-start;
+  margin-top: 24px;
+  gap: 14px;
+}
+
+.planner-prompt-actions .btn {
+  min-width: 142px;
+  padding-inline: 24px;
 }
 
 .planner-readiness-head {
@@ -2988,61 +4110,84 @@ onBeforeUnmount(() => {
 .planner-route-shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: 390px 1fr;
+  grid-template-columns: 430px 1fr;
   overflow: hidden;
 }
 
 .planner-route-panel {
   position: relative;
   z-index: 2;
-  overflow: auto;
-  padding: 22px;
+  overflow: hidden;
+  padding: 14px;
   background: var(--brand-paper-white);
   border-right: 1px solid var(--brand-line);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 11px;
 }
 
 .rv-back-btn {
   width: fit-content;
-  background: #f5d8cf;
-  color: #743927;
-  border-color: rgba(151, 68, 49, 0.18);
+  min-height: 54px;
+  margin-bottom: 4px;
+  padding: 0 30px;
+  border-color: var(--brand-line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--brand-ink-soft);
+  font-size: 1.05rem;
 }
 
 .rv-back-btn:hover {
-  background: #efc9bd;
+  background: #fff;
 }
 
-.rv-back-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: #fff;
-  color: #743927;
+.planner-route-panel .rv-dest-header {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.planner-route-panel .rv-dest-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+}
+
+.planner-route-panel .rv-dest-icon-wrap img {
+  width: 20px;
+  height: 20px;
+}
+
+.planner-route-panel .rv-dest-type-label {
+  font-size: 0.78rem;
 }
 
 .rv-dest-name {
   margin: 0;
   font-family: var(--font-body);
   color: var(--brand-ink-soft);
-  font-size: 1.35rem;
+  font-size: 1.08rem;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
+.rv-dest-address {
+  margin-top: 3px;
+  color: var(--brand-ink-muted);
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.32;
+}
+
 .rv-stats-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .rv-stat-card {
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .rv-stat-main {
@@ -3054,7 +4199,7 @@ onBeforeUnmount(() => {
 
 .rv-stat-card strong {
   color: #1b5e20;
-  font-size: 1.8rem;
+  font-size: 1.28rem;
   font-weight: 950;
   line-height: 1;
 }
@@ -3070,7 +4215,7 @@ onBeforeUnmount(() => {
 
 .rv-section {
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .rv-fac-grid {
@@ -3079,8 +4224,23 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
+.rv-route-fac-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.planner-route-panel .rv-fac-card img {
+  width: 20px;
+  height: 20px;
+}
+
+.planner-route-panel .rv-section h3 {
+  font-size: 0.9rem;
+}
+
 .rv-fac-card {
-  padding: 12px;
+  min-height: 78px;
+  padding: 7px;
   display: grid;
   place-items: center;
   gap: 6px;
@@ -3090,7 +4250,7 @@ onBeforeUnmount(() => {
 .rv-fac-card strong {
   display: block;
   color: var(--brand-ink-soft);
-  font-size: 1.4rem;
+  font-size: 1.02rem;
   font-weight: 950;
   line-height: 1;
 }
@@ -3124,37 +4284,38 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   color: var(--brand-ink-muted);
-  font-size: 1rem;
+  min-height: 37px;
+  font-size: 1.12rem;
   font-weight: 800;
 }
 
 .rv-legend-icon {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  flex: 0 0 32px;
+  flex: 0 0 34px;
   display: grid;
   place-items: center;
 }
 
-.rv-licon-start { background: #a8d4e2; border: 2.5px solid #4e8292; }
-.rv-licon-dest { background: #efa62b; border: 2.5px solid #9f6416; }
-.rv-licon-bench { background: #7cb342; border: 2.5px solid #558b2f; }
-.rv-licon-toilet { background: #2196f3; border: 2.5px solid #1565c0; }
-.rv-licon-fountain { background: #00bcd4; border: 2.5px solid #0097a7; }
+.rv-licon-start { background: #a8d4e2; border: 2px solid #4e8292; }
+.rv-licon-dest { background: #efa62b; border: 2px solid #9f6416; }
+.rv-licon-bench { background: #7cb342; border: 2px solid #558b2f; }
+.rv-licon-toilet { background: #2196f3; border: 2px solid #1565c0; }
+.rv-licon-fountain { background: #00bcd4; border: 2px solid #0097a7; }
 
 .rv-ldot {
   flex: 0 0 auto;
 }
 
 .rv-ldot-route {
-  width: 28px;
+  width: 34px;
   height: 5px;
   border-top: 4px dashed #2e7d32;
 }
 
 .rv-ldot-shade {
-  width: 28px;
+  width: 34px;
   height: 16px;
   border-radius: 5px;
   border: 1px solid rgba(76, 131, 67, 0.34);
@@ -3213,6 +4374,10 @@ onBeforeUnmount(() => {
   display: grid;
   justify-items: center;
   pointer-events: auto;
+}
+
+.planner-marker-highlighted {
+  z-index: 80;
 }
 
 .rv-pin-start {
@@ -3298,13 +4463,14 @@ onBeforeUnmount(() => {
   .planner-step-nav {
     position: relative;
     top: auto;
+    left: auto;
     right: auto;
     width: min(100% - var(--gutter) * 2, 980px);
     margin-left: auto;
     margin-right: auto;
     margin-top: calc(var(--nav-h) + 36px);
     transform: none;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -3360,7 +4526,7 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) {
   .planner-step-nav {
     width: min(100% - 24px, 520px);
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 5px;
   }
 
@@ -3403,6 +4569,51 @@ onBeforeUnmount(() => {
   .planner-summary-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .planner-result-toolbar {
+    justify-content: stretch;
+  }
+
+  .planner-result-toolbar label,
+  .planner-result-toolbar select {
+    width: 100%;
+  }
+
+  .planner-destination-card {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .planner-destination-rank {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+    font-size: 1.15rem;
+  }
+
+  .planner-destination-body {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-destination-topline,
+  .planner-destination-main,
+  .planner-card-score,
+  .planner-destination-metrics,
+  .planner-feature-chip-row,
+  .planner-view-details {
+    grid-column: 1;
+  }
+
+  .planner-card-score {
+    grid-row: auto;
+    justify-items: start;
+  }
+
+  .planner-score-badge-large {
+    width: fit-content;
+    min-height: 52px;
+    flex-direction: row;
   }
 
   .route-planner-page .btn,
