@@ -20,7 +20,6 @@
 
     <section v-if="!isRouteView" class="planner-shell planner-flow-shell">
       <section class="planner-flow-hero">
-        <p class="planner-flow-kicker">Walk Planner</p>
         <h1>Plan a cooler, easier walk.</h1>
       
       </section>
@@ -401,7 +400,7 @@
 
     <div v-if="isReadinessPromptOpen" class="planner-readiness-backdrop" role="presentation">
       <section class="planner-readiness-modal planner-readiness-prompt" role="dialog" aria-modal="true" aria-labelledby="readiness-prompt-title">
-        <button class="planner-modal-close" type="button" aria-label="Skip checklist and open route" @click="skipReadinessAndOpenRoute">X</button>
+        <button class="planner-modal-close" type="button" aria-label="Close readiness prompt" @click="closeReadinessToResults">X</button>
         <div class="planner-readiness-head">
           <div>
             <p>Before you go</p>
@@ -420,7 +419,7 @@
 
     <div v-if="isReadinessOpen" class="planner-readiness-backdrop" role="presentation">
       <section class="planner-readiness-modal" role="dialog" aria-modal="true" aria-labelledby="readiness-title">
-        <button class="planner-modal-close" type="button" aria-label="Close checklist and open route" @click="confirmReadyToGo">X</button>
+        <button class="planner-modal-close" type="button" aria-label="Close checklist" @click="closeReadinessToResults">X</button>
         <div class="planner-readiness-head">
           <div>
             <p>Pre-trip Check</p>
@@ -479,12 +478,7 @@
           </label>
         </div>
 
-        <div class="planner-readiness-result">
-          <strong>{{ readinessResult.title }}</strong>
-          <span>{{ readinessResult.copy }}</span>
-        </div>
-
-        <div class="planner-summary-actions">
+        <div class="planner-summary-actions planner-readiness-actions">
           <button class="btn btn-primary planner-ready-btn" type="button" @click="confirmReadyToGo">Open route</button>
         </div>
       </section>
@@ -2680,6 +2674,7 @@ const skipReadinessAndOpenRoute = async () => {
   await confirmReadyToGo()
 }
 const closeReadinessToResults = async () => {
+  isReadinessPromptOpen.value = false
   isReadinessOpen.value = false
   visibleStep.value = 3
   destroyMiniMap()
@@ -2900,15 +2895,17 @@ onBeforeUnmount(() => {
 }
 
 .planner-flow-shell {
-  padding: calc(var(--nav-h) + 80px) 0 84px;
+  padding: calc(var(--nav-h) + 52px) 0 84px;
 }
 
 .planner-flow-hero {
-  min-height: 34vh;
+  min-height: 28vh;
   display: grid;
-  align-content: end;
+  align-content: center;
+  justify-items: center;
   gap: 16px;
-  padding: clamp(44px, 7vw, 90px) 0 28px;
+  padding: clamp(18px, 3.6vw, 46px) 0 54px;
+  text-align: center;
 }
 
 .planner-flow-kicker,
@@ -2924,9 +2921,9 @@ onBeforeUnmount(() => {
 }
 
 .planner-flow-hero h1 {
-  max-width: 12ch;
+  max-width: min(100%, 20ch);
   font-family: var(--font-body);
-  font-size: var(--brand-fs-h2);
+  font-size: clamp(3rem, 4vw, 3.5rem);
   font-weight: 950;
   line-height: var(--brand-lh-heading);
   letter-spacing: 0;
@@ -2989,7 +2986,11 @@ onBeforeUnmount(() => {
   color: var(--brand-ink-soft);
 }
 
-.planner-card-heading h2,
+.planner-card-heading h2 {
+  font-size: clamp(2.625rem, 3vw, 3rem);
+  line-height: 1.08;
+}
+
 .planner-readiness-head h2 {
   font-size: clamp(2rem, 4vw, 3.2rem);
   line-height: 1.06;
@@ -3993,9 +3994,9 @@ onBeforeUnmount(() => {
 }
 
 .planner-readiness-prompt .planner-readiness-head h2 {
-  max-width: 13ch;
-  font-size: clamp(2.15rem, 5vw, 3.6rem);
-  line-height: 1.08;
+  max-width: 18ch;
+  font-size: clamp(1.65rem, 3.6vw, 2.65rem);
+  line-height: 1.12;
 }
 
 .planner-readiness-prompt .planner-readiness-advice {
@@ -4014,6 +4015,10 @@ onBeforeUnmount(() => {
 .planner-prompt-actions .btn {
   min-width: 142px;
   padding-inline: 24px;
+}
+
+.planner-readiness-actions {
+  margin-top: 18px;
 }
 
 .planner-readiness-head {
