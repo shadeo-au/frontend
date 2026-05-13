@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import AppNav from '@/components/AppNav.vue';
 import SectionKicker from '@/components/SectionKicker.vue';
 import ClayCard from '@/components/ClayCard.vue';
+import BrandWatermark from '@/components/BrandWatermark.vue';
 import MedicationPicker from '@/components/medicine/MedicationPicker.vue';
 import MedicationRiskPanel from '@/components/medicine/MedicationRiskPanel.vue';
 import { DISCLAIMER, SOURCES } from '@/lib/selfcheck/medication-data';
@@ -55,6 +56,7 @@ const sourceList = Object.values(SOURCES);
     <main>
       <!-- §1 Hero -->
       <section class="mc-section mc-section--hero">
+        <BrandWatermark />
         <div class="mc-section__inner">
           <header class="mc-head">
             <SectionKicker>Medicine Check</SectionKicker>
@@ -157,10 +159,17 @@ const sourceList = Object.values(SOURCES);
   padding: clamp(48px, 7vw, 96px) 0;
 }
 .mc-section--hero {
+  overflow: hidden;
+  isolation: isolate;
   padding-top: calc(var(--nav-h) + 64px);
   background:
     radial-gradient(circle at 84% 30%, rgba(244, 183, 158, 0.18), transparent 30%),
     var(--brand-paper-white);
+}
+
+.mc-section--hero .mc-section__inner {
+  position: relative;
+  z-index: 1;
 }
 .mc-section--work {
   background: linear-gradient(180deg, var(--brand-paper-white), #f7f2e8);
