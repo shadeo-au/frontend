@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppButton from '@/components/AppButton.vue';
 import ClayCard from '@/components/ClayCard.vue';
 import WizardQuestion from './WizardQuestion.vue';
+import { gsap, prefersReducedMotion } from '@/lib/gsap';
 import type {
   AreaProfile,
   SelfCheckAnswers,
@@ -22,6 +23,8 @@ const emit = defineEmits<{
 
 const stepLabels = ['Your area', 'Your health', 'Your home', 'Your support'];
 const step = ref(0);
+const progressEl = ref<HTMLElement | null>(null);
+let ctx: gsap.Context | undefined;
 
 const a = computed(() => props.answers);
 
@@ -62,6 +65,28 @@ const stepValid = computed(() => {
 });
 
 const isLast = computed(() => step.value === stepLabels.length - 1);
+const progressPct = computed(() => `${((step.value + 1) / stepLabels.length) * 100}%`);
+
+const animateProgress = () => {
+  if (!progressEl.value) return;
+  gsap.to(progressEl.value, {
+    '--p': progressPct.value,
+    duration: prefersReducedMotion() ? 0 : 0.4,
+    ease: 'power3.out',
+  });
+};
+
+onMounted(() => {
+  ctx = gsap.context(() => {
+    gsap.set(progressEl.value, { '--p': progressPct.value });
+  }, progressEl.value ?? undefined);
+});
+
+watch(step, animateProgress);
+
+onBeforeUnmount(() => {
+  ctx?.revert();
+});
 </script>
 
 <template>
@@ -79,7 +104,7 @@ const isLast = computed(() => step.value === stepLabels.length - 1);
           <span>{{ i + 1 }}</span>{{ label }}
         </button>
       </div>
-      <div class="wizard__progress" :style="{ '--p': `${((step + 1) / stepLabels.length) * 100}%` }"></div>
+      <div ref="progressEl" class="wizard__progress"></div>
     </div>
 
     <!-- Step 1: Area confirm -->
@@ -388,7 +413,6 @@ const isLast = computed(() => step.value === stepLabels.length - 1);
   width: var(--p, 25%);
   background: linear-gradient(90deg, var(--brand-lime), var(--brand-sage));
   border-radius: 999px;
-  transition: width var(--d-base) var(--ease-out-expo);
 }
 
 .wizard__body {

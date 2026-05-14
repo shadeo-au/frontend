@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ScoreResult } from '@/lib/selfcheck/types';
+import { gsap, prefersReducedMotion } from '@/lib/gsap';
 
 const props = defineProps<{ result: ScoreResult }>();
+const root = ref<HTMLElement | null>(null);
+let ctx: gsap.Context | undefined;
 
 const dims = [
   { key: 'location', label: 'Location exposure', value: () => props.result.locationExposureScore, tone: 'sun' as const },
@@ -9,10 +13,37 @@ const dims = [
   { key: 'home',     label: 'Home cooling risk',  value: () => props.result.homeCoolingRiskScore, tone: 'sage' as const },
   { key: 'social',   label: 'Support gap',        value: () => props.result.socialSupportGapScore, tone: 'sky' as const },
 ];
+
+const animateBars = async () => {
+  await nextTick();
+  const fills = root.value?.querySelectorAll<HTMLElement>('.bar__fill') ?? [];
+  if (!fills.length) return;
+
+  gsap.killTweensOf(fills);
+  gsap.set(fills, { transformOrigin: 'left center' });
+  if (prefersReducedMotion()) {
+    gsap.set(fills, { scaleX: 1 });
+    return;
+  }
+
+  gsap.fromTo(fills, { scaleX: 0 }, { scaleX: 1, duration: 0.62, stagger: 0.08, ease: 'power3.out' });
+};
+
+onMounted(() => {
+  ctx = gsap.context(() => {
+    animateBars();
+  }, root.value ?? undefined);
+});
+
+watch(() => props.result, animateBars, { deep: true });
+
+onBeforeUnmount(() => {
+  ctx?.revert();
+});
 </script>
 
 <template>
-  <div class="bars">
+  <div ref="root" class="bars">
     <div class="bars__total">
       <small>Total awareness score</small>
       <strong>
@@ -106,7 +137,8 @@ const dims = [
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  transition: width var(--d-base) var(--ease-out-expo);
+  transform-origin: left center;
+  will-change: transform;
 }
 .bar__tick {
   position: absolute;

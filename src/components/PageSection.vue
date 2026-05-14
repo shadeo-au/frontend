@@ -103,9 +103,7 @@ withDefaults(
 [data-scroll-fade] {
   opacity: 0;
   transform: translateY(24px);
-  transition:
-    opacity 1040ms var(--ease-out-expo) var(--fade-delay, 0ms),
-    transform 1040ms var(--ease-out-expo) var(--fade-delay, 0ms);
+  will-change: opacity, transform;
 }
 
 [data-scroll-fade].is-in {

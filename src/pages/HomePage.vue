@@ -6,152 +6,82 @@ import HeroBlendSection from '../components/HeroBlendSection.vue';
 import PageSection from '../components/PageSection.vue';
 import SectionKicker from '../components/SectionKicker.vue';
 import VisualPanel from '../components/VisualPanel.vue';
+import { gsap, prefersReducedMotion, ScrollTrigger } from '../lib/gsap';
 
 const root = ref<HTMLElement | null>(null);
-let cleanupSectionScroller: (() => void) | undefined;
-let cleanupScrollFade: (() => void) | undefined;
+let gsapCtx: gsap.Context | undefined;
 
-const sectionIds = ['hero', 'intro', 'navigation', 'awareness', 'self-check'];
+onMounted(() => {
+  gsapCtx = gsap.context(() => {
+    const fadeEls = gsap.utils.toArray<HTMLElement>('[data-scroll-fade]');
 
-const easeInOutCubic = (t: number) => (
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-);
-
-const getNearestSectionIndex = () => {
-  const viewportMiddle = window.scrollY + window.innerHeight / 2;
-  let nearest = 0;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-
-  sectionIds.forEach((id, index) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-
-    const sectionMiddle = el.offsetTop + el.offsetHeight / 2;
-    const distance = Math.abs(sectionMiddle - viewportMiddle);
-    if (distance < nearestDistance) {
-      nearest = index;
-      nearestDistance = distance;
-    }
-  });
-
-  return nearest;
-};
-
-const setupSectionScroller = () => {
-  const canUseControlledScroll = window.matchMedia('(min-width: 900px) and (pointer: fine)').matches
-    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (!canUseControlledScroll) return undefined;
-
-  let currentIndex = getNearestSectionIndex();
-  let isAnimating = false;
-  let animationFrame = 0;
-  let wheelRemainder = 0;
-  let suppressWheelUntil = 0;
-
-  const animateTo = (targetIndex: number) => {
-    const target = document.getElementById(sectionIds[targetIndex]);
-    if (!target || targetIndex === currentIndex) return;
-
-    window.cancelAnimationFrame(animationFrame);
-    isAnimating = true;
-    currentIndex = targetIndex;
-
-    const start = window.scrollY;
-    const end = target.offsetTop;
-    const distance = end - start;
-    const duration = Math.min(920, Math.max(620, Math.abs(distance) * 0.42));
-    const startedAt = performance.now();
-
-    const frame = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / duration);
-      window.scrollTo(0, start + distance * easeInOutCubic(progress));
-
-      if (progress < 1) {
-        animationFrame = window.requestAnimationFrame(frame);
-      } else {
-        isAnimating = false;
-        wheelRemainder = 0;
-        suppressWheelUntil = performance.now() + 180;
-      }
-    };
-
-    animationFrame = window.requestAnimationFrame(frame);
-  };
-
-  const onWheel = (event: WheelEvent) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('input, textarea, select, [data-native-scroll]')) return;
-    if (event.ctrlKey) return;
-
-    event.preventDefault();
-    if (isAnimating || performance.now() < suppressWheelUntil) {
-      wheelRemainder = 0;
+    if (prefersReducedMotion()) {
+      gsap.set(fadeEls, { autoAlpha: 1, y: 0, clearProps: 'filter' });
       return;
     }
 
-    wheelRemainder += event.deltaY;
-    if (Math.abs(wheelRemainder) < 42) return;
-
-    currentIndex = getNearestSectionIndex();
-    const direction = wheelRemainder > 0 ? 1 : -1;
-    const nextIndex = Math.max(0, Math.min(sectionIds.length - 1, currentIndex + direction));
-    wheelRemainder = 0;
-    animateTo(nextIndex);
-  };
-
-  const onKeydown = (event: KeyboardEvent) => {
-    const keys = ['PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End'];
-    if (!keys.includes(event.key) || isAnimating) return;
-
-    currentIndex = getNearestSectionIndex();
-    let nextIndex = currentIndex;
-
-    if (event.key === 'PageDown' || event.key === 'ArrowDown') nextIndex += 1;
-    if (event.key === 'PageUp' || event.key === 'ArrowUp') nextIndex -= 1;
-    if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = sectionIds.length - 1;
-
-    nextIndex = Math.max(0, Math.min(sectionIds.length - 1, nextIndex));
-    if (nextIndex === currentIndex) return;
-
-    event.preventDefault();
-    animateTo(nextIndex);
-  };
-
-  window.addEventListener('wheel', onWheel, { passive: false });
-  window.addEventListener('keydown', onKeydown);
-
-  return () => {
-    window.cancelAnimationFrame(animationFrame);
-    window.removeEventListener('wheel', onWheel);
-    window.removeEventListener('keydown', onKeydown);
-  };
-};
-
-onMounted(() => {
-  const fadeEls = root.value?.querySelectorAll('[data-scroll-fade]') ?? [];
-  const fadeObserver = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-in');
-      } else {
-        entry.target.classList.remove('is-in');
-      }
+    gsap.to('.hero-cue span', {
+      scaleX: 1,
+      autoAlpha: 1,
+      duration: 1.2,
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut',
     });
-  }, {
-    rootMargin: '-12% 0px -12% 0px',
-    threshold: 0.18,
-  });
+    gsap.to('.hero-cue i b', {
+      y: 3,
+      autoAlpha: 1,
+      duration: 0.72,
+      repeat: -1,
+      yoyo: true,
+      stagger: 0.14,
+      ease: 'sine.inOut',
+    });
 
-  fadeEls.forEach((el) => fadeObserver.observe(el));
-  cleanupScrollFade = () => fadeObserver.disconnect();
-  cleanupSectionScroller = setupSectionScroller();
+    fadeEls.forEach((el) => {
+      const delay = Number.parseFloat(getComputedStyle(el).getPropertyValue('--fade-delay')) || 0;
+      const isScene = el.classList.contains('why-overview__scene');
+      const hiddenY = isScene
+        ? (el.classList.contains('why-overview__scene--left') ? 34 : -34)
+        : 22;
+      const shownY = isScene
+        ? (el.classList.contains('why-overview__scene--left') ? -18 : 18)
+        : 0;
+
+      const reset = () => {
+        gsap.set(el, { autoAlpha: 0, y: hiddenY });
+      };
+      const play = () => {
+        gsap.fromTo(
+          el,
+          { autoAlpha: 0, y: hiddenY },
+          {
+            autoAlpha: 1,
+            y: shownY,
+            duration: 0.98,
+            delay: delay / 1000,
+            ease: 'power3.out',
+          }
+        );
+      };
+
+      reset();
+      ScrollTrigger.create({
+        trigger: el,
+        start: 'top 86%',
+        end: 'bottom 12%',
+        onEnter: play,
+        onEnterBack: play,
+        onLeave: reset,
+        onLeaveBack: reset,
+      });
+    });
+  }, root.value ?? undefined);
+
 });
 
 onBeforeUnmount(() => {
-  cleanupScrollFade?.();
-  cleanupSectionScroller?.();
+  gsapCtx?.revert();
 });
 </script>
 
@@ -327,7 +257,8 @@ onBeforeUnmount(() => {
   height: 1px;
   background: linear-gradient(90deg, var(--brand-lime-hover), rgba(98, 133, 107, 0.35));
   transform-origin: left center;
-  animation: cue-line 2.4s var(--ease-in-out) infinite;
+  transform: scaleX(0.72);
+  opacity: 0.66;
 }
 
 .hero-cue strong {
@@ -351,17 +282,8 @@ onBeforeUnmount(() => {
   display: block;
   border-right: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
+  transform: translateY(-2px) rotate(45deg);
   opacity: 0.45;
-  animation: cue-chevron 1.45s var(--ease-in-out) infinite;
-}
-
-.hero-cue i b:nth-child(2) {
-  animation-delay: 140ms;
-}
-
-.hero-cue i b:nth-child(3) {
-  animation-delay: 280ms;
 }
 
 .hero-cue:hover,
@@ -372,28 +294,6 @@ onBeforeUnmount(() => {
 .hero-cue:hover span,
 .hero-cue:focus-visible span {
   background: linear-gradient(90deg, var(--brand-gold), var(--brand-lime-hover));
-}
-
-@keyframes cue-line {
-  0%, 100% {
-    transform: scaleX(0.72);
-    opacity: 0.66;
-  }
-  50% {
-    transform: scaleX(1);
-    opacity: 1;
-  }
-}
-
-@keyframes cue-chevron {
-  0%, 100% {
-    opacity: 0.32;
-    transform: translateY(-2px) rotate(45deg);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(3px) rotate(45deg);
-  }
 }
 
 .why-overview {
@@ -841,9 +741,6 @@ onBeforeUnmount(() => {
 [data-rise] {
   opacity: 0;
   transform: translateY(18px);
-  transition:
-    opacity var(--d-long) var(--ease-out-expo) var(--rise-delay, 0ms),
-    transform var(--d-long) var(--ease-out-expo) var(--rise-delay, 0ms);
 }
 
 [data-rise].is-in {
@@ -854,9 +751,7 @@ onBeforeUnmount(() => {
 [data-scroll-fade] {
   opacity: 0;
   transform: translateY(22px);
-  transition:
-    opacity 980ms var(--ease-out-expo) var(--fade-delay, 0ms),
-    transform 980ms var(--ease-out-expo) var(--fade-delay, 0ms);
+  will-change: transform, opacity;
 }
 
 [data-scroll-fade].is-in {

@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import BrandWatermark from './BrandWatermark.vue';
+import { gsap, prefersReducedMotion } from '../lib/gsap';
+
+const root = ref<HTMLElement | null>(null);
+let ctx: gsap.Context | undefined;
 
 withDefaults(
   defineProps<{
@@ -14,10 +19,34 @@ withDefaults(
     sideLabel: '',
   }
 );
+
+onMounted(() => {
+  if (!root.value) return;
+
+  ctx = gsap.context(() => {
+    const art = root.value?.querySelector('.hero-blend__art');
+    const copy = root.value?.querySelector('.hero-blend__copy');
+    if (!art || !copy) return;
+
+    if (prefersReducedMotion()) {
+      gsap.set([art, copy], { autoAlpha: 1, x: 0 });
+      gsap.set(copy, { y: 74 });
+      return;
+    }
+
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    tl.fromTo(art, { autoAlpha: 0, x: 52 }, { autoAlpha: 1, x: 0, duration: 1.2 })
+      .fromTo(copy, { autoAlpha: 0, x: -36, y: 74 }, { autoAlpha: 1, x: 0, y: 74, duration: 0.88 }, 0.32);
+  }, root.value);
+});
+
+onBeforeUnmount(() => {
+  ctx?.revert();
+});
 </script>
 
 <template>
-  <section :id="id" class="hero-blend">
+  <section :id="id" ref="root" class="hero-blend">
     <BrandWatermark />
     <span v-if="sideLabel" class="hero-blend__side-label">{{ sideLabel }}</span>
 
@@ -68,7 +97,6 @@ withDefaults(
   border-radius: 0;
   overflow: hidden;
   will-change: transform, opacity;
-  animation: hb-art-in 1.2s cubic-bezier(0.16, 0.84, 0.44, 1) 0.08s both;
 }
 
 .hero-blend__art::before {
@@ -101,7 +129,6 @@ withDefaults(
   gap: 30px;
   transform: translateY(74px);
   will-change: transform, opacity;
-  animation: hb-copy-in 0.88s cubic-bezier(0.16, 0.84, 0.44, 1) 0.32s both;
 }
 
 .hero-blend :slotted(h1) {
@@ -123,32 +150,10 @@ withDefaults(
   line-height: 1.72;
 }
 
-@keyframes hb-art-in {
-  from {
-    opacity: 0;
-    transform: translateX(52px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes hb-copy-in {
-  from {
-    opacity: 0;
-    transform: translateX(-36px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(0, 74px);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .hero-blend__art,
   .hero-blend__copy {
-    animation: none;
+    opacity: 1;
   }
 }
 

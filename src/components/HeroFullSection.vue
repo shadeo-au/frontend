@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { gsap, prefersReducedMotion } from '../lib/gsap';
+
+const root = ref<HTMLElement | null>(null);
+let ctx: gsap.Context | undefined;
+
 withDefaults(
   defineProps<{
     id?: string;
@@ -10,10 +16,33 @@ withDefaults(
     imageAlt: '',
   }
 );
+
+onMounted(() => {
+  if (!root.value) return;
+
+  ctx = gsap.context(() => {
+    const art = root.value?.querySelector('.hero-full__art');
+    const copy = root.value?.querySelector('.hero-full__copy');
+    if (!art || !copy) return;
+
+    if (prefersReducedMotion()) {
+      gsap.set([art, copy], { autoAlpha: 1, y: 0, scale: 1 });
+      return;
+    }
+
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    tl.fromTo(art, { autoAlpha: 0, scale: 1.06 }, { autoAlpha: 1, scale: 1, duration: 1.35 })
+      .fromTo(copy, { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 0.9 }, 0.58);
+  }, root.value);
+});
+
+onBeforeUnmount(() => {
+  ctx?.revert();
+});
 </script>
 
 <template>
-  <section :id="id" class="hero-full" aria-label="Hero">
+  <section :id="id" ref="root" class="hero-full" aria-label="Hero">
     <!-- Background image -->
     <div class="hero-full__art" aria-hidden="true">
       <img :src="imageSrc" :alt="imageAlt" />
@@ -48,7 +77,7 @@ withDefaults(
   position: absolute;
   inset: 0;
   z-index: 0;
-  animation: hf-image-in 1.4s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  will-change: transform, opacity;
 }
 
 .hero-full__art img {
@@ -80,7 +109,7 @@ withDefaults(
   position: relative;
   z-index: 2;
   width: min(100%, 860px);
-  animation: hf-copy-rise 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) 0.72s both;
+  will-change: transform, opacity;
 }
 
 .hero-full :slotted(h1) {
@@ -96,33 +125,11 @@ withDefaults(
 }
 
 /* ── Animations ─────────────────────────────────────────────── */
-@keyframes hf-image-in {
-  from {
-    opacity: 0;
-    transform: scale(1.06);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes hf-copy-rise {
-  from {
-    opacity: 0;
-    transform: translateY(28px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Reduced motion ─────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .hero-full__art,
   .hero-full__copy {
-    animation: none;
+    opacity: 1;
   }
 }
 

@@ -44,3 +44,17 @@ install.cmd
 *.pdf
 *.docx
 *.xlsx
+
+# SHVI ETL intermediates — regenerable from backend/backend/scripts/
+/data-raw/
+/data-mid/
+
+# Frontend SA1-detail dataset (33 MB) — not currently wired to the UI;
+# regenerate via backend/backend/scripts/build_frontend_outputs.py when needed.
+/public/data/shvi_sa1_2021.json
+
+# Backend large precomputed data caches (footpath, OSM, canopy)
+backend/backend/data/footpath-steepness.geojson
+
+# Tooling artefacts not part of the project
+/skills-lock.json

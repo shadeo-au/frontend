@@ -5,15 +5,11 @@ import AppButton from '../components/AppButton.vue';
 import HeroFullSection from '../components/HeroFullSection.vue';
 import SectionKicker from '../components/SectionKicker.vue';
 import BrandWatermark from '../components/BrandWatermark.vue';
+import { gsap, prefersReducedMotion, ScrollTrigger } from '../lib/gsap';
 
 const root = ref<HTMLElement | null>(null);
 const openReason = ref(-1);
-let cleanupObservers: (() => void) | undefined;
-const countAnimationFrames = new Set<number>();
-
-const easeOutExpo = (progress: number) => (
-  progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)
-);
+let whyCtx: gsap.Context | undefined;
 
 const formatCount = (value: number) => Math.round(value).toLocaleString('en-AU');
 
@@ -42,91 +38,79 @@ const toggleReason = (index: number) => {
 
 const animateCount = (el: HTMLElement) => {
   const target = Number(el.dataset.countTo ?? 0);
-  const duration = Number(el.dataset.countDuration ?? 1400);
-  const startedAt = performance.now();
+  const duration = Number(el.dataset.countDuration ?? 1400) / 1000;
+  const counter = { value: 0 };
 
-  const tick = (now: number) => {
-    const progress = Math.min(1, (now - startedAt) / duration);
-    const eased = easeOutExpo(progress);
-    el.textContent = formatCount(target * eased);
-
-    if (progress < 1) {
-      const frame = window.requestAnimationFrame(tick);
-      countAnimationFrames.add(frame);
-    } else {
-      el.textContent = formatCount(target);
+  gsap.killTweensOf(counter);
+  gsap.fromTo(
+    counter,
+    { value: 0 },
+    {
+      value: target,
+      duration,
+      ease: 'expo.out',
+      onUpdate: () => {
+        el.textContent = formatCount(counter.value);
+      },
+      onComplete: () => {
+        el.textContent = formatCount(target);
+      },
     }
-  };
-
-  const frame = window.requestAnimationFrame(tick);
-  countAnimationFrames.add(frame);
+  );
 };
 
 onMounted(() => {
-  const els = root.value?.querySelectorAll('[data-rise]') ?? [];
-  const fadeEls = root.value?.querySelectorAll('[data-record-text-fade]') ?? [];
-  const riseObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-in');
-          riseObserver.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.1 }
-  );
+  whyCtx = gsap.context(() => {
+    const riseEls = gsap.utils.toArray<HTMLElement>('[data-rise]');
+    const fadeEls = gsap.utils.toArray<HTMLElement>('[data-record-text-fade]');
+    const countEls = gsap.utils.toArray<HTMLElement>('[data-count-to]');
 
-  const recordFadeObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.intersectionRatio >= 0.18) {
-          entry.target.classList.add('is-in');
-        } else if (entry.intersectionRatio <= 0.02) {
-          entry.target.classList.remove('is-in');
-        }
+    if (prefersReducedMotion()) {
+      gsap.set([...riseEls, ...fadeEls], { autoAlpha: 1, y: 0 });
+      countEls.forEach((el) => {
+        el.textContent = formatCount(Number(el.dataset.countTo ?? 0));
       });
-    },
-    {
-      rootMargin: '-6% 0px -6% 0px',
-      threshold: [0, 0.02, 0.18],
-    }
-  );
-
-  const countEls = root.value?.querySelectorAll<HTMLElement>('[data-count-to]') ?? [];
-  const countObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        const el = entry.target as HTMLElement;
-        animateCount(el);
-        countObserver.unobserve(el);
-      });
-    },
-    { threshold: 0.35 }
-  );
-
-  els.forEach((el) => riseObserver.observe(el));
-  fadeEls.forEach((el) => recordFadeObserver.observe(el));
-  countEls.forEach((el) => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      el.textContent = formatCount(Number(el.dataset.countTo ?? 0));
       return;
     }
-    countObserver.observe(el);
-  });
 
-  cleanupObservers = () => {
-    riseObserver.disconnect();
-    recordFadeObserver.disconnect();
-    countObserver.disconnect();
-    countAnimationFrames.forEach((frame) => window.cancelAnimationFrame(frame));
-    countAnimationFrames.clear();
-  };
+    riseEls.forEach((el) => {
+      const delay = Number.parseFloat(getComputedStyle(el).getPropertyValue('--rise-delay')) || 0;
+      gsap.set(el, { autoAlpha: 0, y: 28 });
+      ScrollTrigger.create({
+        trigger: el,
+        start: 'top 88%',
+        onEnter: () => gsap.to(el, { autoAlpha: 1, y: 0, duration: 0.68, delay: delay / 1000, ease: 'power3.out' }),
+      });
+    });
+
+    fadeEls.forEach((el) => {
+      const reset = () => gsap.set(el, { autoAlpha: 0, y: 34 });
+      const play = () => gsap.fromTo(el, { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power3.out' });
+      reset();
+      ScrollTrigger.create({
+        trigger: el,
+        start: 'top 82%',
+        end: 'bottom 8%',
+        onEnter: play,
+        onEnterBack: play,
+        onLeave: reset,
+        onLeaveBack: reset,
+      });
+    });
+
+    countEls.forEach((el) => {
+      ScrollTrigger.create({
+        trigger: el,
+        start: 'top 72%',
+        onEnter: () => animateCount(el),
+        onEnterBack: () => animateCount(el),
+      });
+    });
+  }, root.value ?? undefined);
 });
 
 onBeforeUnmount(() => {
-  cleanupObservers?.();
+  whyCtx?.revert();
 });
 </script>
 
@@ -419,9 +403,7 @@ onBeforeUnmount(() => {
 [data-rise] {
   opacity: 0;
   transform: translateY(28px);
-  transition:
-    opacity 0.68s cubic-bezier(0.22, 0.61, 0.36, 1) var(--rise-delay, 0ms),
-    transform 0.68s cubic-bezier(0.22, 0.61, 0.36, 1) var(--rise-delay, 0ms);
+  will-change: opacity, transform;
 }
 [data-rise].is-in {
   opacity: 1;
@@ -432,9 +414,6 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: translateY(34px);
   will-change: opacity, transform;
-  transition:
-    opacity 900ms var(--ease-out-expo),
-    transform 900ms var(--ease-out-expo);
 }
 
 [data-record-text-fade].is-in {

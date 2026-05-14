@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppNav from '../components/AppNav.vue';
 import AppButton from '../components/AppButton.vue';
 import BrandWatermark from '../components/BrandWatermark.vue';
 import SectionKicker from '../components/SectionKicker.vue';
 import HeroFullSection from '../components/HeroFullSection.vue';
 import HviCanvasMap from '../components/awareness/HviCanvasMap.vue';
+import { gsap, prefersReducedMotion, ScrollTrigger } from '../lib/gsap';
 
 type ExplainerKey = 'shows' | 'built' | 'use';
 type ConcernScore = 1 | 2 | 3 | 4 | 5;
@@ -34,7 +35,10 @@ const mapRef = ref<InstanceType<typeof HviCanvasMap> | null>(null);
 const suburbFeatures = ref<ShviFeature[]>([]);
 const rankingMode = ref<'sensitive' | 'cooler'>('sensitive');
 const includeLowConfidence = ref(false);
-let riseObserver: IntersectionObserver | undefined;
+let riseTriggers: ScrollTrigger[] = [];
+let patternsTrigger: ScrollTrigger | undefined;
+let pageCtx: gsap.Context | undefined;
+let patternBarsRevealed = false;
 
 const concernColorsMap: Record<number, string> = {
   1: '#5a9b68',
@@ -149,11 +153,22 @@ const mapExplainers: Array<{
   },
 ];
 
-const toggleExplainer = (key: ExplainerKey) => {
+const toggleExplainer = async (key: ExplainerKey) => {
+  const nextValue = !flippedExplainers.value[key];
   flippedExplainers.value = {
     ...flippedExplainers.value,
-    [key]: !flippedExplainers.value[key],
+    [key]: nextValue,
   };
+
+  await nextTick();
+  const inner = root.value?.querySelector<HTMLElement>(`[data-explainer-key="${key}"] .map-explainer__inner`);
+  if (!inner) return;
+
+  gsap.to(inner, {
+    rotationY: nextValue ? 180 : 0,
+    duration: prefersReducedMotion() ? 0 : 0.7,
+    ease: 'power3.inOut',
+  });
 };
 
 const concernLevels: Array<{
@@ -255,42 +270,258 @@ const handleMapLearnMore = async (score: number) => {
   showFollowupSections.value = true;
 
   await nextTick();
-  observeRiseTargets();
+  setupRiseAnimations();
+  ScrollTrigger.refresh();
   riskSection.value?.scrollIntoView({
     behavior: 'smooth',
     block: 'start',
   });
 };
 
-const observeRiseTargets = () => {
-  if (!riseObserver) return;
+const riseFromVars = (el: HTMLElement) => {
+  const type = el.dataset.rise;
+  if (type === 'section-head') return { y: 34, scale: 1, filter: 'saturate(1)' };
+  if (type === 'cards') return { y: 22, scale: 0.985, filter: 'saturate(0.9)' };
+  if (type === 'map' || type === 'panel') return { y: 28, scale: 0.99, filter: 'saturate(0.92)' };
+  return { y: 24, scale: 1, filter: 'saturate(1)' };
+};
 
-  const els = root.value?.querySelectorAll('[data-rise]') ?? [];
+const animateRiseTarget = (el: HTMLElement) => {
+  const delay = Number.parseFloat(getComputedStyle(el).getPropertyValue('--rise-delay')) || 0;
+
+  if (prefersReducedMotion()) {
+    gsap.set(el, { autoAlpha: 1, y: 0, scale: 1, filter: 'none' });
+    return;
+  }
+
+  gsap.fromTo(
+    el,
+    { autoAlpha: 0, ...riseFromVars(el) },
+    {
+      autoAlpha: 1,
+      y: 0,
+      scale: 1,
+      filter: 'none',
+      duration: 0.88,
+      delay: delay / 1000,
+      ease: 'power3.out',
+    }
+  );
+
+  if (el.dataset.rise === 'cards') {
+    const cards = el.querySelectorAll<HTMLElement>('.map-explainer__card');
+    gsap.fromTo(
+      cards,
+      { autoAlpha: 0, y: 22, rotationX: 2 },
+      { autoAlpha: 1, y: 0, rotationX: 0, duration: 0.72, stagger: 0.11, ease: 'power3.out' }
+    );
+  }
+};
+
+const resetRiseTarget = (el: HTMLElement) => {
+  if (prefersReducedMotion()) {
+    gsap.set(el, { autoAlpha: 1, y: 0, scale: 1, filter: 'none' });
+    return;
+  }
+
+  gsap.set(el, { autoAlpha: 0, ...riseFromVars(el) });
+};
+
+const setupRiseAnimations = () => {
+  riseTriggers.forEach((trigger) => trigger.kill());
+  riseTriggers = [];
+
+  const els = gsap.utils.toArray<HTMLElement>(root.value?.querySelectorAll('[data-rise]') ?? []);
   els.forEach((el) => {
-    if (!el.classList.contains('is-in')) riseObserver?.observe(el);
+    resetRiseTarget(el);
+    riseTriggers.push(ScrollTrigger.create({
+      trigger: el,
+      start: 'top 86%',
+      end: 'bottom 12%',
+      onEnter: () => animateRiseTarget(el),
+      onEnterBack: () => animateRiseTarget(el),
+      onLeaveBack: () => resetRiseTarget(el),
+    }));
   });
 };
 
-onMounted(() => {
-  riseObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-in');
-          riseObserver?.unobserve(entry.target);
-        }
-      });
-    },
+const animateBars = (selector: string, delay = 0) => {
+  const bars = gsap.utils.toArray<HTMLElement>(root.value?.querySelectorAll(selector) ?? []);
+  if (!bars.length) return;
+
+  gsap.killTweensOf(bars);
+  gsap.set(bars, { transformOrigin: 'left center' });
+
+  if (prefersReducedMotion()) {
+    gsap.set(bars, { scaleX: 1 });
+    return;
+  }
+
+  gsap.fromTo(
+    bars,
+    { scaleX: 0 },
     {
-      rootMargin: '-8% 0px -10% 0px',
-      threshold: 0.14,
+      scaleX: 1,
+      duration: 0.74,
+      delay,
+      ease: 'power3.out',
+      stagger: 0.045,
     }
   );
-  observeRiseTargets();
+};
+
+const hideBars = (selector: string) => {
+  const bars = gsap.utils.toArray<HTMLElement>(root.value?.querySelectorAll(selector) ?? []);
+  if (!bars.length) return;
+  gsap.killTweensOf(bars);
+  gsap.set(bars, {
+    scaleX: prefersReducedMotion() ? 1 : 0,
+    transformOrigin: 'left center',
+  });
+};
+
+const animateRankingBars = (delay = 0) => animateBars('.ranking-row__bar i', delay);
+const animateSeniorsBars = (delay = 0) => animateBars('.seniors-chart__bar i', delay);
+const hideRankingBars = () => hideBars('.ranking-row__bar i');
+const hideSeniorsBars = () => hideBars('.seniors-chart__bar i');
+const animatePatternBars = () => {
+  patternBarsRevealed = true;
+  animateRankingBars();
+  animateSeniorsBars();
+};
+
+const getPatternDataEls = () => gsap.utils.toArray<HTMLElement>(
+  root.value?.querySelectorAll(
+    '.patterns-card__filter, .ranking-list, .seniors-chart, .patterns-card__finding, .patterns-card__caveat, .patterns-card__loading'
+  ) ?? []
+);
+
+const hidePatternDataEls = () => {
+  const dataEls = getPatternDataEls();
+  if (!dataEls.length) return;
+  gsap.killTweensOf(dataEls);
+  gsap.set(dataEls, {
+    autoAlpha: prefersReducedMotion() ? 1 : 0,
+    y: prefersReducedMotion() ? 0 : 12,
+  });
+};
+
+const resetPatternSequence = () => {
+  const grid = root.value?.querySelector<HTMLElement>('.patterns-grid');
+  if (!grid) return;
+
+  patternBarsRevealed = false;
+  const cards = gsap.utils.toArray<HTMLElement>(grid.querySelectorAll('.patterns-card'));
+  const headers = gsap.utils.toArray<HTMLElement>(grid.querySelectorAll('.patterns-card__head'));
+  const dataEls = getPatternDataEls();
+
+  if (prefersReducedMotion()) {
+    gsap.set([grid, ...cards, ...headers, ...dataEls], { autoAlpha: 1, y: 0, scale: 1 });
+    hideRankingBars();
+    hideSeniorsBars();
+    return;
+  }
+
+  gsap.killTweensOf([grid, ...cards, ...headers, ...dataEls]);
+  gsap.set(grid, { autoAlpha: 1, y: 0, scale: 1 });
+  gsap.set(cards, { autoAlpha: 0, y: 24 });
+  gsap.set(headers, { autoAlpha: 0, y: 14 });
+  gsap.set(dataEls, { autoAlpha: 0, y: 12 });
+  hideRankingBars();
+  hideSeniorsBars();
+};
+
+const playPatternSequence = () => {
+  const grid = root.value?.querySelector<HTMLElement>('.patterns-grid');
+  if (!grid) return;
+
+  const cards = gsap.utils.toArray<HTMLElement>(grid.querySelectorAll('.patterns-card'));
+  const headers = gsap.utils.toArray<HTMLElement>(grid.querySelectorAll('.patterns-card__head'));
+  const dataEls = getPatternDataEls();
+
+  if (prefersReducedMotion()) {
+    gsap.set([...cards, ...headers, ...dataEls], { autoAlpha: 1, y: 0 });
+    animatePatternBars();
+    return;
+  }
+
+  gsap.timeline({ defaults: { ease: 'power3.out' } })
+    .to(cards, { autoAlpha: 1, y: 0, duration: 0.42, stagger: 0.08 })
+    .to(headers, { autoAlpha: 1, y: 0, duration: 0.34, stagger: 0.06 }, '-=0.24')
+    .to(dataEls, {
+      autoAlpha: 1,
+      y: 0,
+      duration: 0.34,
+      stagger: 0.03,
+      onStart: () => {
+        patternBarsRevealed = true;
+        animateRankingBars(0.02);
+        animateSeniorsBars(0.06);
+      },
+    }, '-=0.12');
+};
+
+const setupPatternBarTrigger = () => {
+  patternsTrigger?.kill();
+  resetPatternSequence();
+  const grid = root.value?.querySelector<HTMLElement>('.patterns-grid');
+  if (!grid) return;
+
+  patternsTrigger = ScrollTrigger.create({
+    trigger: grid,
+    start: 'top 82%',
+    end: 'bottom 18%',
+    onEnter: playPatternSequence,
+    onEnterBack: playPatternSequence,
+    onLeaveBack: resetPatternSequence,
+  });
+};
+
+watch([rankedSuburbs, rankingMode, includeLowConfidence], async () => {
+  await nextTick();
+  if (patternBarsRevealed) animateRankingBars();
+  else {
+    hidePatternDataEls();
+    hideRankingBars();
+  }
+  ScrollTrigger.refresh();
+}, { flush: 'post' });
+
+watch(seniorsByBand, async () => {
+  await nextTick();
+  if (patternBarsRevealed) animateSeniorsBars();
+  else {
+    hidePatternDataEls();
+    hideSeniorsBars();
+  }
+  ScrollTrigger.refresh();
+}, { flush: 'post' });
+
+watch(activeConcern, async () => {
+  await nextTick();
+  const content = root.value?.querySelectorAll<HTMLElement>('.story-shell__text > *, .story-shell__visual img') ?? [];
+  if (!content.length || prefersReducedMotion()) return;
+
+  gsap.fromTo(
+    content,
+    { autoAlpha: 0, y: 16 },
+    { autoAlpha: 1, y: 0, duration: 0.46, stagger: 0.08, ease: 'power3.out' }
+  );
+});
+
+onMounted(() => {
+  pageCtx = gsap.context(() => {
+    gsap.set('.map-explainer__inner', { transformStyle: 'preserve-3d', rotationY: 0 });
+  }, root.value ?? undefined);
+
+  setupRiseAnimations();
+  setupPatternBarTrigger();
 });
 
 onBeforeUnmount(() => {
-  riseObserver?.disconnect();
+  riseTriggers.forEach((trigger) => trigger.kill());
+  patternsTrigger?.kill();
+  pageCtx?.revert();
 });
 </script>
 
@@ -332,6 +563,7 @@ onBeforeUnmount(() => {
             :key="item.key"
             type="button"
             class="map-explainer__card"
+            :data-explainer-key="item.key"
             :class="{ 'is-flipped': flippedExplainers[item.key] }"
             :aria-pressed="flippedExplainers[item.key]"
             @click="toggleExplainer(item.key)"
@@ -368,7 +600,7 @@ onBeforeUnmount(() => {
 
       <!-- ─── Bottom: Patterns across GMEL — top suburbs + key finding chart ─── -->
       <!-- Always rendered (not gated by Learn More) — shows loading state until map data loads -->
-      <section class="patterns-section" data-rise="patterns">
+      <section class="patterns-section">
         <BrandWatermark />
         <span class="patterns-section__side">Section 02b - Patterns</span>
 
@@ -381,7 +613,7 @@ onBeforeUnmount(() => {
           </p>
         </div>
 
-        <div class="patterns-grid" data-rise="patterns-grid">
+        <div class="patterns-grid">
           <!-- LEFT: Top suburbs ranking with toggle -->
           <article class="patterns-card">
             <header class="patterns-card__head">
@@ -885,11 +1117,7 @@ onBeforeUnmount(() => {
   min-height: inherit;
   display: block;
   transform-style: preserve-3d;
-  transition: transform 700ms var(--ease-out-expo);
-}
-
-.map-explainer__card.is-flipped .map-explainer__inner {
-  transform: rotateY(180deg);
+  will-change: transform;
 }
 
 .map-explainer__face {
@@ -1005,10 +1233,6 @@ onBeforeUnmount(() => {
 [data-rise] {
   opacity: 0;
   transform: translateY(26px);
-  transition:
-    opacity 880ms var(--ease-out-expo) var(--rise-delay, 0ms),
-    transform 880ms var(--ease-out-expo) var(--rise-delay, 0ms),
-    filter 880ms var(--ease-out-expo) var(--rise-delay, 0ms);
   will-change: opacity, transform;
 }
 
@@ -1035,29 +1259,6 @@ onBeforeUnmount(() => {
   opacity: 1;
   transform: none;
   filter: none;
-}
-
-.map-explainer.is-in .map-explainer__card {
-  animation: explainer-card-rise 780ms var(--ease-out-expo) both;
-}
-
-.map-explainer.is-in .map-explainer__card:nth-child(2) {
-  animation-delay: 110ms;
-}
-
-.map-explainer.is-in .map-explainer__card:nth-child(3) {
-  animation-delay: 210ms;
-}
-
-@keyframes explainer-card-rise {
-  from {
-    opacity: 0;
-    transform: translateY(22px) rotateX(2deg);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 .story-shell {
@@ -1376,15 +1577,6 @@ onBeforeUnmount(() => {
     opacity: 1;
     transform: none;
     filter: none;
-    transition: none;
-  }
-
-  .map-explainer.is-in .map-explainer__card {
-    animation: none;
-  }
-
-  .map-explainer__inner {
-    transition: none;
   }
 }
 
@@ -1589,7 +1781,8 @@ onBeforeUnmount(() => {
   display: block;
   height: 100%;
   border-radius: 999px;
-  transition: width 380ms var(--ease-out-expo);
+  transform-origin: left center;
+  will-change: transform;
 }
 
 .ranking-row__value {
@@ -1652,7 +1845,8 @@ onBeforeUnmount(() => {
   display: block;
   height: 100%;
   border-radius: 999px;
-  transition: width 460ms var(--ease-out-expo);
+  transform-origin: left center;
+  will-change: transform;
 }
 
 .seniors-chart__value {

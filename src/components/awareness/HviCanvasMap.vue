@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import InfoTip from './InfoTip.vue';
+import { gsap, prefersReducedMotion } from '../../lib/gsap';
 
 type HviProperties = {
   // SHVI 2021 schema (see docs/handoff/SHVI_DataScienceHandoff.md §5.1)
@@ -58,6 +59,8 @@ type LeafletMap = {
   zoomIn: () => void;
   zoomOut: () => void;
   getZoom: () => number;
+  setMinZoom: (zoom: number) => void;
+  setMaxBounds: (bounds: unknown) => void;
   on: (event: string, handler: () => void) => void;
   off: (event: string, handler: () => void) => void;
 };
@@ -129,6 +132,7 @@ const concernColors: Record<number, string> = {
   5: '#c95949',
 };
 
+const root = ref<HTMLElement | null>(null);
 const mapEl = ref<HTMLElement | null>(null);
 const loading = ref(true);
 const loadError = ref('');
@@ -144,6 +148,7 @@ let geoJsonLayer: LeafletGeoJson | undefined;
 let selectedLayer: LeafletLayer | undefined;
 let resizeObserver: ResizeObserver | undefined;
 let baseZoom = 0;
+let hviCtx: gsap.Context | undefined;
 
 const localityName = computed(() => selectedFeature.value?.properties.suburb_name ?? 'Suburb');
 
@@ -461,6 +466,32 @@ const resetView = () => {
   nextTick(() => map?.invalidateSize());
 };
 
+const animateSelectedPanel = async () => {
+  await nextTick();
+  const panel = root.value?.querySelector<HTMLElement>('.hvi-map__panel');
+  if (!panel) return;
+
+  const bars = panel.querySelectorAll<HTMLElement>('.hvi-map__bar i');
+  gsap.killTweensOf([panel, ...bars]);
+
+  if (prefersReducedMotion()) {
+    gsap.set(panel, { autoAlpha: 1, x: 0 });
+    gsap.set(bars, { scaleX: 1 });
+    return;
+  }
+
+  gsap.fromTo(panel, { autoAlpha: 0, x: 18 }, { autoAlpha: 1, x: 0, duration: 0.36, ease: 'power3.out' });
+  gsap.fromTo(
+    bars,
+    { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.62, stagger: 0.08, ease: 'power3.out', delay: 0.08 }
+  );
+};
+
+watch(selectedFeature, () => {
+  animateSelectedPanel();
+});
+
 const setupMap = async () => {
   const target = mapEl.value;
   if (!target) return;
@@ -522,6 +553,8 @@ const setupMap = async () => {
     addSuburbLabels(leaflet, data);
     map.fitBounds(geoJsonLayer.getBounds(), { padding: [20, 20], animate: false });
     baseZoom = map.getZoom();
+    map.setMinZoom(baseZoom);
+    map.setMaxBounds(geoJsonLayer.getBounds());
     updateLabelBand();
     map.on('zoomend', updateLabelBand);
 
@@ -544,6 +577,7 @@ const handleEscape = (e: KeyboardEvent) => {
 };
 
 onMounted(() => {
+  hviCtx = gsap.context(() => {}, root.value ?? undefined);
   setupMap();
 
   if (mapEl.value) {
@@ -557,6 +591,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  hviCtx?.revert();
   resizeObserver?.disconnect();
   map?.off('zoomend', updateLabelBand);
   map?.remove();
@@ -565,7 +600,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="hvi-map">
+  <div ref="root" class="hvi-map">
     <div class="hvi-map__toolbar">
       <div>
         <strong>Explore suburbs</strong>
@@ -601,7 +636,10 @@ onBeforeUnmount(() => {
     </div>
 
     <div :class="['hvi-map__body', { 'hvi-map__body--with-panel': hasSelection }]">
-      <div :class="['hvi-map__map-shell', `hvi-map__map-shell--labels-${labelBand}`]">
+      <div
+        :class="['hvi-map__map-shell', `hvi-map__map-shell--labels-${labelBand}`]"
+        data-native-scroll
+      >
         <div
           ref="mapEl"
           class="hvi-map__leaflet"
@@ -657,7 +695,14 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <div v-if="isLowConfidence" class="hvi-map__notice" role="note">
+        <div
+          v-if="isLowConfidence"
+          class="hvi-map__notice"
+          role="note"
+          tabindex="0"
+          title="This suburb covers only 1-2 small statistical areas, so its score has wider uncertainty than larger suburbs."
+          data-tooltip="This suburb covers only 1-2 small statistical areas, so its score has wider uncertainty than larger suburbs."
+        >
           <i aria-hidden="true">!</i>
           <span>This suburb covers only 1–2 small statistical areas, so its score has wider uncertainty than larger suburbs.</span>
         </div>
@@ -738,8 +783,9 @@ onBeforeUnmount(() => {
           <small>Source: ABS 2021 Census</small>
         </div>
 
+        <div class="hvi-map__actions">
         <button type="button" class="hvi-map__details-btn" @click="showDetailModal = true">
-          See full details
+          Full details
           <i aria-hidden="true">→</i>
         </button>
 
@@ -748,6 +794,7 @@ onBeforeUnmount(() => {
             <span>Learn More</span>
             <i aria-hidden="true">→</i>
           </button>
+        </div>
         </div>
       </aside>
     </div>
@@ -1121,48 +1168,15 @@ onBeforeUnmount(() => {
 .hvi-map__panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  /*
-   * Match the map height so the two columns align as siblings. The panel
-   * scrolls vertically when its content exceeds this height; info tooltips
-   * are rendered at <body> level via Teleport (see InfoTip.vue) so they
-   * are not clipped by this overflow context.
-   */
-  max-height: clamp(460px, 72vh, 720px);
-  overflow-y: auto;
+  gap: 12px;
+  height: clamp(460px, 72vh, 720px);
+  overflow-y: hidden;
   overflow-x: clip;          /* explicit: no horizontal scrollbar */
-  padding: clamp(20px, 2.6vw, 28px);
+  padding: clamp(18px, 2vw, 22px);
   border: 1px solid var(--brand-line);
-  border-radius: 30px;
+  border-radius: 24px;
   background: rgba(255, 255, 255, 0.72);
-  animation: hvi-panel-in 360ms var(--ease-out-expo) both;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(98, 133, 107, 0.32) transparent;
-}
-
-.hvi-map__panel::-webkit-scrollbar {
-  width: 6px;
-}
-.hvi-map__panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-.hvi-map__panel::-webkit-scrollbar-thumb {
-  background: rgba(98, 133, 107, 0.32);
-  border-radius: 999px;
-}
-.hvi-map__panel::-webkit-scrollbar-thumb:hover {
-  background: rgba(98, 133, 107, 0.5);
-}
-
-@keyframes hvi-panel-in {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  will-change: transform, opacity;
 }
 
 .hvi-map__eyebrow {
@@ -1176,9 +1190,11 @@ onBeforeUnmount(() => {
 .hvi-map__panel h3 {
   color: var(--brand-ink);
   font-family: var(--font-body);
-  font-size: clamp(1.75rem, 2.4vw, 2.35rem);
+  font-size: clamp(1.55rem, 1.95vw, 2.05rem);
   font-weight: 950;
+  line-height: 1.04;
   letter-spacing: 0;
+  text-wrap: balance;
 }
 
 .hvi-map__panel p {
@@ -1190,21 +1206,21 @@ onBeforeUnmount(() => {
 
 .hvi-map__score-dots {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .hvi-map__score-dots i {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border: 2px solid rgba(16, 19, 15, 0.1);
-  border-radius: 10px;
+  border-radius: 9px;
   background: rgba(35, 45, 39, 0.08);
 }
 
 .hvi-map__headline {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: nowrap;
 }
 
@@ -1220,14 +1236,14 @@ onBeforeUnmount(() => {
 }
 
 .hvi-map__score-num {
-  font-size: clamp(3.4rem, 5vw, 4.6rem);
+  font-size: clamp(3rem, 4.25vw, 3.8rem);
   font-weight: 950;
   line-height: 1;
 }
 
 .hvi-map__score-den {
   color: var(--brand-ink-muted);
-  font-size: clamp(1.1rem, 1.4vw, 1.5rem);
+  font-size: clamp(1.05rem, 1.25vw, 1.34rem);
   font-weight: 750;
   white-space: nowrap;
 }
@@ -1240,7 +1256,7 @@ onBeforeUnmount(() => {
 .hvi-map__headline strong {
   display: block;
   color: var(--brand-ink);
-  font-size: 1.18rem;
+  font-size: 1.08rem;
   font-weight: 900;
   line-height: 1.2;
 }
@@ -1249,9 +1265,9 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--brand-ink-muted);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 750;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1339,33 +1355,100 @@ onBeforeUnmount(() => {
 /* ─── Low-confidence notice ─────────────────────────────────────────── */
 
 .hvi-map__notice {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 14px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
   border: 1px solid rgba(223, 167, 64, 0.32);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 244, 223, 0.72);
   color: var(--brand-ink-muted);
-  font-size: 0.92rem;
+  font-size: 0.78rem;
   font-weight: 650;
-  line-height: 1.4;
+  line-height: 1.28;
+  cursor: help;
+  outline: none;
+}
+
+.hvi-map__notice span {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .hvi-map__notice i {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: inline-grid;
   place-items: center;
   border-radius: 50%;
   background: rgba(223, 167, 64, 0.78);
   color: var(--brand-paper-white);
   font-family: var(--font-editorial);
-  font-size: 0.95rem;
+  font-size: 0.86rem;
   font-style: normal;
   font-weight: 900;
   line-height: 1;
+}
+
+.hvi-map__notice::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 8;
+  width: min(320px, calc(100vw - 48px));
+  padding: 12px 14px;
+  border: 1px solid rgba(223, 167, 64, 0.34);
+  border-radius: 14px;
+  background: rgba(255, 253, 248, 0.98);
+  box-shadow: 0 14px 32px rgba(35, 45, 39, 0.16);
+  color: var(--brand-ink-muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.42;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.hvi-map__notice::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  z-index: 9;
+  width: 12px;
+  height: 12px;
+  border-right: 1px solid rgba(223, 167, 64, 0.34);
+  border-bottom: 1px solid rgba(223, 167, 64, 0.34);
+  background: rgba(255, 253, 248, 0.98);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px) rotate(45deg);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.hvi-map__notice:hover::before,
+.hvi-map__notice:hover::after,
+.hvi-map__notice:focus-visible::before,
+.hvi-map__notice:focus-visible::after {
+  opacity: 1;
+}
+
+.hvi-map__notice:hover::after,
+.hvi-map__notice:focus-visible::after {
+  transform: translate(-50%, 0);
+}
+
+.hvi-map__notice:hover::before,
+.hvi-map__notice:focus-visible::before {
+  transform: translate(-50%, 0) rotate(45deg);
 }
 
 /* ─── Layer 1: factor breakdown bars ────────────────────────────────── */
@@ -1373,45 +1456,45 @@ onBeforeUnmount(() => {
 .hvi-map__breakdown {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px;
+  gap: 11px;
+  padding: 14px;
   border: 1px solid var(--brand-line-soft);
-  border-radius: 20px;
+  border-radius: 18px;
   background: rgba(251, 250, 247, 0.86);
 }
 
 .hvi-map__breakdown h4 {
-  margin: 0 0 2px;
+  margin: 0;
   color: var(--brand-ink);
-  font-size: 1.02rem;
+  font-size: 1rem;
   font-weight: 900;
 }
 
 .hvi-map__factor {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .hvi-map__factor-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   color: var(--brand-ink-muted);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 750;
 }
 
 .hvi-map__factor-head strong {
   color: var(--brand-ink);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 900;
 }
 
 .hvi-map__bar {
   position: relative;
-  height: 10px;
+  height: 9px;
   border-radius: 999px;
   background: rgba(35, 45, 39, 0.08);
   overflow: hidden;
@@ -1428,7 +1511,9 @@ onBeforeUnmount(() => {
   display: block;
   height: 100%;
   border-radius: 999px;
-  transition: width 380ms var(--ease-out-expo), background 240ms ease;
+  transform-origin: left center;
+  will-change: transform;
+  transition: background 240ms ease;
 }
 
 /* ─── Stats row (older residents + confidence) ──────────────────────── */
@@ -1466,31 +1551,35 @@ onBeforeUnmount(() => {
 /* ─── Single stat row (replaces 2-cell grid; cleaner) ────────────────── */
 
 .hvi-map__stat-single {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 12px 14px;
   border: 1px solid var(--brand-line-soft);
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(251, 250, 247, 0.72);
 }
 
 .hvi-map__stat-single > span:first-child {
+  min-width: 0;
   color: var(--brand-ink-muted);
   font-size: 0.86rem;
   font-weight: 750;
+  line-height: 1.25;
 }
 
 .hvi-map__stat-single strong {
   color: var(--brand-ink);
-  font-size: 1.42rem;
+  font-size: 1.34rem;
   font-weight: 950;
   letter-spacing: -0.01em;
 }
 
 .hvi-map__stat-single small {
+  grid-column: 1 / -1;
   color: var(--brand-ink-muted);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   font-style: italic;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1498,18 +1587,26 @@ onBeforeUnmount(() => {
 
 /* ─── "See full details" CTA button (opens modal) ────────────────────── */
 
+.hvi-map__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+  margin-top: 2px;
+}
+
 .hvi-map__details-btn {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 11px 16px;
+  gap: 8px;
+  padding: 10px 14px;
   border: 1px solid rgba(98, 133, 107, 0.3);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(228, 248, 213, 0.42);
   color: var(--brand-ink-soft);
   font-family: inherit;
-  font-size: 0.96rem;
+  font-size: 0.94rem;
   font-weight: 800;
   cursor: pointer;
   transition: background 180ms ease, transform 180ms ease;
@@ -1820,23 +1917,23 @@ onBeforeUnmount(() => {
 
 .hvi-map__source {
   width: fit-content;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .hvi-map__source-button {
-  min-width: min(100%, 250px);
-  min-height: 64px;
+  min-width: min(100%, 170px);
+  min-height: 46px;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 0 10px 0 26px;
+  gap: 12px;
+  padding: 0 8px 0 18px;
   border: 1px solid transparent;
-  border-radius: 26px;
+  border-radius: 22px;
   background: var(--brand-lime);
   color: var(--brand-ink);
   box-shadow: var(--brand-shadow-nav);
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 900;
   letter-spacing: 0.01em;
   transition:
@@ -1847,15 +1944,15 @@ onBeforeUnmount(() => {
 }
 
 .hvi-map__source-button i {
-  width: 46px;
-  height: 46px;
+  width: 34px;
+  height: 34px;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.86);
   color: var(--brand-ink);
-  font-size: 1.35rem;
+  font-size: 1.18rem;
   font-style: normal;
   font-weight: 950;
   line-height: 1;
@@ -1967,6 +2064,7 @@ onBeforeUnmount(() => {
     height: clamp(420px, 64vh, 560px);
   }
   .hvi-map__panel {
+    height: auto;
     max-height: none;  /* mobile stacks below map — let panel grow naturally */
     overflow-y: visible;
   }
