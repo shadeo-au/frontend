@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { HeatSnapshot, HeatAlertLevel, SuburbIndexEntry } from '@/lib/selfcheck/types';
 import { alertLabel, uvBand } from '@/lib/selfcheck/open-meteo';
 import LocationPicker from './LocationPicker.vue';
+import { gsap, prefersReducedMotion } from '@/lib/gsap';
 
 const props = defineProps<{
   suburb: SuburbIndexEntry | null;
@@ -10,6 +11,9 @@ const props = defineProps<{
   loading: boolean;
   error: string | null;
 }>();
+
+const root = ref<HTMLElement | null>(null);
+let ctx: gsap.Context | undefined;
 
 defineEmits<{
   (e: 'change-location', s: SuburbIndexEntry): void;
@@ -31,10 +35,37 @@ const ratingDots = computed(() => {
   if (!lvl) return 0;
   return ({ none: 1, low: 2, severe: 3, extreme: 4 } as const)[lvl];
 });
+
+const animateForecastBars = async () => {
+  await nextTick();
+  const bars = root.value?.querySelectorAll<HTMLElement>('.forecast-day__bar span') ?? [];
+  if (!bars.length) return;
+
+  gsap.killTweensOf(bars);
+  gsap.set(bars, { transformOrigin: 'bottom center' });
+  if (prefersReducedMotion()) {
+    gsap.set(bars, { scaleY: 1 });
+    return;
+  }
+
+  gsap.fromTo(bars, { scaleY: 0 }, { scaleY: 1, duration: 0.58, stagger: 0.07, ease: 'power3.out' });
+};
+
+onMounted(() => {
+  ctx = gsap.context(() => {
+    animateForecastBars();
+  }, root.value ?? undefined);
+});
+
+watch(() => props.snapshot, animateForecastBars);
+
+onBeforeUnmount(() => {
+  ctx?.revert();
+});
 </script>
 
 <template>
-  <div class="snapshot">
+  <div ref="root" class="snapshot">
     <div class="snapshot__head">
       <span class="snapshot__kicker">Today in your area</span>
       <h1 class="snapshot__title">
@@ -304,7 +335,8 @@ function weekdayShort(iso: string): string {
   height: clamp(8px, var(--h, 24px), 78px);
   border-radius: 8px;
   background: var(--brand-lime);
-  transition: height var(--d-base) var(--ease-out-expo);
+  transform-origin: bottom center;
+  will-change: transform;
 }
 .forecast-day__bar span[data-hot='true']      { background: var(--brand-gold); }
 .forecast-day__bar span[data-very-hot='true'] { background: #d77252; }

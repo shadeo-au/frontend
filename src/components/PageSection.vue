@@ -25,11 +25,11 @@ withDefaults(
     <BrandWatermark v-if="sideWatermark" placement="side" />
     <span v-if="sideLabel" class="page-section__side-label">{{ sideLabel }}</span>
 
-    <div class="page-section__copy" data-rise>
+    <div class="page-section__copy">
       <slot name="copy" />
     </div>
 
-    <div class="page-section__visual" data-rise style="--rise-delay: 90ms">
+    <div class="page-section__visual" data-scroll-fade style="--fade-delay: 260ms">
       <slot name="visual" />
     </div>
   </section>
@@ -91,7 +91,7 @@ withDefaults(
   max-width: 560px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 28px;
   z-index: 2;
 }
 
@@ -100,23 +100,34 @@ withDefaults(
   z-index: 1;
 }
 
+[data-scroll-fade] {
+  opacity: 0;
+  transform: translateY(24px);
+  will-change: opacity, transform;
+}
+
+[data-scroll-fade].is-in {
+  opacity: 1;
+  transform: none;
+}
+
 .page-section :slotted(h2) {
-  max-width: 12.5ch;
+  max-width: 14ch;
   color: var(--brand-ink);
-  font-family: var(--font-body);
-  font-size: var(--brand-fs-h2);
-  font-weight: 950;
-  line-height: var(--brand-lh-heading);
+  font-family: var(--font-editorial);
+  font-size: clamp(2.45rem, 4vw, 4.45rem);
+  font-weight: 500;
+  line-height: 1.07;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
 .page-section :slotted(p) {
-  max-width: var(--brand-copy-width);
+  max-width: 46ch;
   color: var(--brand-ink-muted);
-  font-size: var(--brand-fs-lead);
-  font-weight: 650;
-  line-height: var(--brand-lh-copy);
+  font-size: clamp(1.08rem, 1.12vw, 1.2rem);
+  font-weight: 500;
+  line-height: 1.72;
 }
 
 .page-section :slotted(.section-actions) {
@@ -171,6 +182,14 @@ withDefaults(
 
   .page-section :slotted(p) {
     max-width: 34ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll-fade] {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 </style>

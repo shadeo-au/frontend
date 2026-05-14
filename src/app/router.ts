@@ -23,6 +23,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/SelfCheckPage.vue'),
   },
   {
+    path: '/medicine-check',
+    component: () => import('../pages/MedicineCheckPage.vue'),
+  },
+  {
     path: '/cool-routes',
     redirect: '/walk-planner',
   },

@@ -55,6 +55,8 @@
 
   /* Type ------------------------------------------------------- */
   --font-display:  "Fraunces", "Source Serif 4", Georgia, serif;
+  --font-editorial: "Bitter", "Source Serif 4", Georgia, serif;
+  --font-script:   "Caveat", "Segoe Print", cursive;
   --font-body:     "Manrope", "Inter", system-ui, sans-serif;
 
   --fs-display:    clamp(3rem, 7vw, 5.5rem);

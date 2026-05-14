@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 
 const SESSION_KEY = 'shadeo_gate_unlocked_v1';
@@ -34,12 +34,12 @@ async function submit() {
 
   busy.value = true;
   try {
-    const hash = await sha256Hex(password.value);
+    const hash = await sha256Hex(password.value.trim());
     if (hash === EXPECTED) {
       try {
         sessionStorage.setItem(SESSION_KEY, '1');
       } catch {
-        /* sessionStorage unavailable — still unlock for this view */
+        /* sessionStorage unavailable, still unlock for this view */
       }
       emit('unlock');
     } else {
@@ -93,12 +93,12 @@ async function submit() {
           class="gate__submit"
           :disabled="busy || !password"
         >
-          {{ busy ? 'Checking…' : 'Continue' }}
+          {{ busy ? 'Checking...' : 'Continue' }}
         </button>
       </form>
 
       <p class="gate__hint">
-        Course preview · FIT5120 Industry Experience Studio Project, Monash University.
+        Course preview - FIT5120 Industry Experience Studio Project, Monash University.
       </p>
     </main>
   </div>
@@ -114,8 +114,8 @@ async function submit() {
   padding: clamp(24px, 6vw, 64px);
   color: var(--brand-ink);
   background:
-    radial-gradient(circle at 22% -8%, rgba(155, 224, 111, 0.18), transparent 32%),
-    radial-gradient(circle at 80% 110%, rgba(232, 165, 58, 0.16), transparent 38%),
+    radial-gradient(circle at 22% -8%, rgba(142, 199, 210, 0.20), transparent 32%),
+    radial-gradient(circle at 80% 110%, rgba(241, 178, 74, 0.18), transparent 38%),
     linear-gradient(180deg, var(--brand-paper-white) 0%, var(--brand-paper) 100%);
   overflow: hidden;
 }
@@ -133,7 +133,7 @@ async function submit() {
   top: -120px;
   right: -80px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(232, 165, 58, 0.42), transparent 70%);
+  background: radial-gradient(circle, rgba(241, 178, 74, 0.42), transparent 70%);
   filter: blur(2px);
 }
 .gate__leaf {
@@ -166,8 +166,8 @@ async function submit() {
   flex-direction: column;
   gap: 18px;
   padding: clamp(28px, 4vw, 44px);
-  border-radius: 32px;
-  background: rgba(255, 255, 255, 0.92);
+  border-radius: 28px;
+  background: rgba(255, 250, 242, 0.92);
   border: 1.5px solid var(--brand-line);
   box-shadow: var(--brand-shadow-panel);
   backdrop-filter: blur(10px);
@@ -179,13 +179,13 @@ async function submit() {
   font-weight: 900;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--shade-deep);
+  color: var(--brand-teal);
 }
 
 .gate__title {
   font-family: var(--font-body);
   font-size: clamp(2rem, 4vw, 2.6rem);
-  font-weight: 950;
+  font-weight: 700;
   line-height: 1.05;
   letter-spacing: 0;
   color: var(--brand-ink);
@@ -222,7 +222,7 @@ async function submit() {
 .gate__input {
   min-height: 56px;
   padding: 14px 18px;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1.5px solid var(--brand-line);
   background: rgba(255, 255, 255, 0.96);
   font-family: var(--font-body);
@@ -234,8 +234,8 @@ async function submit() {
   outline: 0;
 }
 .gate__input:focus-visible {
-  border-color: var(--brand-sage);
-  box-shadow: inset 0 0 0 2px var(--brand-sage);
+  border-color: var(--brand-teal);
+  box-shadow: inset 0 0 0 2px rgba(13, 111, 114, 0.34);
 }
 
 .gate__error {
@@ -253,8 +253,8 @@ async function submit() {
   min-height: 56px;
   padding: 0 24px;
   border-radius: 28px;
-  background: var(--brand-lime);
-  color: #142016;
+  background: var(--brand-teal);
+  color: #fff;
   font-family: var(--font-body);
   font-size: 1.125rem;
   font-weight: 900;
@@ -264,7 +264,7 @@ async function submit() {
   transition: background var(--d-fast) ease, transform var(--d-fast) ease;
 }
 .gate__submit:hover:not(:disabled) {
-  background: var(--brand-lime-hover);
+  background: #095f62;
 }
 .gate__submit:active:not(:disabled) { transform: scale(0.99); }
 .gate__submit:disabled { opacity: 0.55; cursor: not-allowed; }
