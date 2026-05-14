@@ -10,11 +10,109 @@ import HviCanvasMap from '../components/awareness/HviCanvasMap.vue';
 type ExplainerKey = 'shows' | 'built' | 'use';
 type ConcernScore = 1 | 2 | 3 | 4 | 5;
 
+type ShviFeatureProps = {
+  sal_code: string;
+  suburb_name: string;
+  shvi_score: number | null;
+  shvi_raw: number | null;
+  shvi_band_label: string | null;
+  older_population: number;
+  total_population: number;
+  sa1_count: number;
+  no_seniors: boolean;
+  low_confidence: boolean;
+};
+
+type ShviFeature = { properties: ShviFeatureProps };
+
 const root = ref<HTMLElement | null>(null);
 const activeConcern = ref<ConcernScore>(1);
 const showFollowupSections = ref(false);
 const riskSection = ref<HTMLElement | null>(null);
+const mapSection = ref<HTMLElement | null>(null);
+const mapRef = ref<InstanceType<typeof HviCanvasMap> | null>(null);
+const suburbFeatures = ref<ShviFeature[]>([]);
+const rankingMode = ref<'sensitive' | 'cooler'>('sensitive');
+const includeLowConfidence = ref(false);
 let riseObserver: IntersectionObserver | undefined;
+
+const concernColorsMap: Record<number, string> = {
+  1: '#5a9b68',
+  2: '#a9cc67',
+  3: '#efb447',
+  4: '#df8740',
+  5: '#c95949',
+};
+
+const handleMapDataLoaded = (features: ShviFeature[]) => {
+  suburbFeatures.value = features;
+};
+
+const rankedSuburbs = computed(() => {
+  const eligible = suburbFeatures.value.filter((f) => {
+    const p = f.properties;
+    if (p.shvi_raw == null || p.shvi_score == null) return false;
+    if (!includeLowConfidence.value && p.low_confidence) return false;
+    return true;
+  });
+  const sorted = [...eligible].sort((a, b) => {
+    const av = a.properties.shvi_raw ?? 0;
+    const bv = b.properties.shvi_raw ?? 0;
+    return rankingMode.value === 'sensitive' ? bv - av : av - bv;
+  });
+  return sorted.slice(0, 10);
+});
+
+const rankingMaxValue = computed(() => {
+  if (!rankedSuburbs.value.length) return 1;
+  const values = rankedSuburbs.value.map((f) => f.properties.shvi_raw ?? 0);
+  // Use absolute max so positive and negative SHVI both scale comparably
+  return Math.max(...values.map((v) => Math.abs(v))) || 1;
+});
+
+// "Where do older residents live?" — aggregate older_population by band
+const seniorsByBand = computed(() => {
+  const buckets: Record<number, { count: number; suburbs: number }> = {
+    1: { count: 0, suburbs: 0 },
+    2: { count: 0, suburbs: 0 },
+    3: { count: 0, suburbs: 0 },
+    4: { count: 0, suburbs: 0 },
+    5: { count: 0, suburbs: 0 },
+  };
+  suburbFeatures.value.forEach((f) => {
+    const b = f.properties.shvi_score;
+    if (b && b >= 1 && b <= 5) {
+      buckets[b].count += f.properties.older_population || 0;
+      buckets[b].suburbs += 1;
+    }
+  });
+  const total = Object.values(buckets).reduce((s, x) => s + x.count, 0);
+  return [1, 2, 3, 4, 5].map((b) => ({
+    band: b,
+    count: buckets[b].count,
+    suburbs: buckets[b].suburbs,
+    pct: total > 0 ? (buckets[b].count / total) * 100 : 0,
+  }));
+});
+
+const seniorsBandMax = computed(() => Math.max(...seniorsByBand.value.map((b) => b.count)) || 1);
+
+const totalSeniorsHigher = computed(() => {
+  const buckets = seniorsByBand.value;
+  const upper = buckets[3].count + buckets[4].count;  // band 4 + 5 (idx 3, 4)
+  const total = buckets.reduce((s, x) => s + x.count, 0);
+  return total ? Math.round((upper / total) * 100) : 0;
+});
+
+const handleRankingSelect = async (salCode: string) => {
+  if (!mapSection.value) return;
+  mapSection.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  await nextTick();
+  // Give scroll a moment so map redraws on the right viewport
+  setTimeout(() => {
+    mapRef.value?.selectByCode(salCode);
+  }, 350);
+};
 const flippedExplainers = ref<Record<ExplainerKey, boolean>>({
   shows: false,
   built: false,
@@ -33,21 +131,21 @@ const mapExplainers: Array<{
     number: '01',
     title: 'What it shows',
     eyebrow: 'What it shows',
-    body: 'Each suburb is grouped from one to five. Higher scores mean hot days may be harder for more people in that area.',
+    body: 'A 1-to-5 rank of Greater Melbourne suburbs. A higher band means the area\'s older residents are more likely to need extra community support on hot days. Relative within the city.',
   },
   {
     key: 'built',
     number: '02',
     title: 'How it is built',
     eyebrow: 'How it is built',
-    body: 'The index combines heat exposure, people who may be more sensitive to heat, and local ability to prepare or get support.',
+    body: 'Three factors: heat in the area, older residents at risk, and lack of local support. Computed per statistical area, then aggregated to suburbs by 65+ population.',
   },
   {
     key: 'use',
     number: '03',
     title: 'How to use it',
     eyebrow: 'How to use it',
-    body: 'Search or tap a suburb, then use the result to plan cooler routes, check personal risk, or arrange earlier check-ins.',
+    body: 'Surface the suburbs where older residents are most exposed. Useful for residents and their families, community groups, and council heat-outreach planning.',
   },
 ];
 
@@ -74,10 +172,10 @@ const concernLevels: Array<{
 }> = [
   {
     score: 1,
-    label: '1 — Lower concern',
-    badge: 'Score 1 — Lower concern',
-    title: 'Your suburb is well-supported for hot days.',
-    body: 'Residents here generally have good access to shade, green space, and cooling facilities. Older adults are less likely to face serious heat-related health risks, as the local environment and community infrastructure provide solid support during hot weather.',
+    label: '1 — Cooler area',
+    badge: 'Score 1 — Cooler area',
+    title: 'A cooler patch of the city.',
+    body: 'Generous tree cover, cooler surfaces, and a strong baseline of local support put residents here in good shape during heat. Older neighbours benefit from the usual care — hydration reminders and a friendly check-in for anyone living alone.',
     imageSrc: '/risk-score-1.png',
     dot: '#4f982e',
     background: 'rgba(228, 248, 213, 0.62)',
@@ -88,10 +186,10 @@ const concernLevels: Array<{
   },
   {
     score: 2,
-    label: '2 — Low concern',
-    badge: 'Score 2 — Low concern',
-    title: 'Mostly comfortable, with some gaps to watch.',
-    body: 'These suburbs have reasonable tree cover and access to cool places, but some gaps exist. Older adults may still need to plan outdoor activities carefully on very hot days, particularly if they live alone or have limited mobility.',
+    label: '2 — Generally manageable',
+    badge: 'Score 2 — Generally manageable',
+    title: 'Comfortable, with a few gaps to plan around.',
+    body: 'Mostly green and well-connected, but some pockets run warmer or have older residents living independently. On heat days a quick check-in with elderly neighbours and a clear plan for cool places to spend the afternoon goes a long way.',
     imageSrc: '/risk-score-2.png',
     dot: '#94c657',
     background: 'rgba(241, 250, 225, 0.72)',
@@ -102,10 +200,10 @@ const concernLevels: Array<{
   },
   {
     score: 3,
-    label: '3 — Moderate concern',
-    badge: 'Score 3 — Moderate concern',
-    title: 'Take extra care during heatwaves.',
-    body: 'A mix of environmental and social factors creates a noticeable heat risk for older residents. Streets may have limited shade, and some residents may lack access to air conditioning or nearby cool spaces. Community check-ins are recommended during heatwaves.',
+    label: '3 — Watch on hot days',
+    badge: 'Score 3 — Watch on hot days',
+    title: 'Worth keeping an eye on during heatwaves.',
+    body: 'Some streets run hot, a moderate share of residents are aged 65+, and access to support varies block by block. Planning ahead pays off — know the nearest cool place (library, community centre), schedule errands for cooler hours, and check in on older neighbours.',
     imageSrc: '/risk-score-3.png',
     dot: '#f2a51f',
     background: 'rgba(255, 244, 223, 0.86)',
@@ -116,10 +214,10 @@ const concernLevels: Array<{
   },
   {
     score: 4,
-    label: '4 — High concern',
-    badge: 'Score 4 — High concern',
-    title: 'Seek cool spaces early on hot days.',
-    body: 'These suburbs face significant heat vulnerability. Hard surfaces, low tree canopy, and a higher proportion of older residents living alone make extreme heat particularly dangerous. Residents are strongly encouraged to seek cool environments early and stay connected with family, neighbours, or community services.',
+    label: '4 — Heat-sensitive area',
+    badge: 'Score 4 — Heat-sensitive area',
+    title: 'Cool spaces and check-ins matter here.',
+    body: 'Heat sits longer in this area, and a substantial share of older residents would benefit from extra community contact during heatwaves. Pre-identify cooling spots, make sure family and neighbours know who lives alone, and follow up on the second hot day of a streak.',
     imageSrc: '/risk-score-4.png',
     dot: '#df5f34',
     background: 'rgba(255, 239, 232, 0.88)',
@@ -130,10 +228,10 @@ const concernLevels: Array<{
   },
   {
     score: 5,
-    label: '5 — Highest concern',
-    badge: 'Score 5 — Highest concern',
-    title: 'Immediate action needed during heatwaves.',
-    body: 'This suburb faces the greatest combination of heat exposure, population sensitivity, and limited adaptive capacity. During heatwaves, residents — especially older adults — are at serious risk of heat exhaustion or heatstroke. Immediate access to cool places, regular welfare checks, and early action are essential.',
+    label: '5 — Most heat-sensitive',
+    badge: 'Score 5 — Most heat-sensitive area',
+    title: 'Where extra community attention helps the most.',
+    body: 'Three challenging factors meet here: hotter local conditions, a high share of older residents (including many living alone), and limited local support resources. Welfare check-ins, council cooling programs, and family scheduling reach a lot of people on heat days.',
     imageSrc: '/risk-score-5.png',
     dot: '#b52b31',
     background: 'rgba(255, 235, 236, 0.88)',
@@ -209,22 +307,21 @@ onBeforeUnmount(() => {
         <h1>See where hot days may be harder.</h1>
       </HeroFullSection>
 
-      <section id="hvi-map" class="map-section">
+      <section id="hvi-map" ref="mapSection" class="map-section">
         <BrandWatermark />
         <span class="map-section__side">Section 02 - Suburb Map</span>
 
         <div class="map-section__intro" data-rise="section-head">
-          <SectionKicker>Suburb heat vulnerability view</SectionKicker>
+          <SectionKicker>Senior heat-sensitivity view</SectionKicker>
           <h2>
-            Heat
-            <span class="awareness-script">vulnerability</span>
-            map.
+            Senior heat
+            <span class="awareness-script">sensitivity</span>
           </h2>
           <div class="map-section__description">
             <img src="/awareness-map-overview.png" alt="" aria-hidden="true" />
             <p>
-              Heat vulnerability shows where hot places and people who may need extra care
-              overlap. This map helps turn a broad heat warning into a local pattern.
+              Where hot places overlap with older residents who may benefit from extra
+              support — turning a city-wide heat warning into a local picture you can act on.
             </p>
           </div>
         </div>
@@ -261,7 +358,150 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <HviCanvasMap data-rise="map" @learn-more="handleMapLearnMore" />
+        <HviCanvasMap
+          ref="mapRef"
+          data-rise="map"
+          @learn-more="handleMapLearnMore"
+          @data-loaded="handleMapDataLoaded"
+        />
+      </section>
+
+      <!-- ─── Bottom: Patterns across GMEL — top suburbs + key finding chart ─── -->
+      <!-- Always rendered (not gated by Learn More) — shows loading state until map data loads -->
+      <section class="patterns-section" data-rise="patterns">
+        <BrandWatermark />
+        <span class="patterns-section__side">Section 02b - Patterns</span>
+
+        <div class="patterns-section__intro" data-rise="section-head">
+          <SectionKicker>Patterns across Greater Melbourne</SectionKicker>
+          <h2>Across the <span class="awareness-script awareness-script--inline">city</span></h2>
+          <p>
+            Two readings of the same dataset — which suburbs sit at the extremes today,
+            and where the older population is concentrated across the five bands.
+          </p>
+        </div>
+
+        <div class="patterns-grid" data-rise="patterns-grid">
+          <!-- LEFT: Top suburbs ranking with toggle -->
+          <article class="patterns-card">
+            <header class="patterns-card__head">
+              <div>
+                <h3>Top 10 suburbs</h3>
+                <p>Click a row to view its full breakdown on the map.</p>
+              </div>
+              <div class="patterns-toggle" role="tablist" aria-label="Switch ranking direction">
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="rankingMode === 'sensitive'"
+                  :class="{ 'is-active': rankingMode === 'sensitive' }"
+                  @click="rankingMode = 'sensitive'"
+                >Most heat-sensitive</button>
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="rankingMode === 'cooler'"
+                  :class="{ 'is-active': rankingMode === 'cooler' }"
+                  @click="rankingMode = 'cooler'"
+                >Cooler areas</button>
+              </div>
+            </header>
+
+            <label class="patterns-card__filter">
+              <input type="checkbox" v-model="includeLowConfidence" />
+              <span>Include small suburbs (1–2 statistical areas)</span>
+            </label>
+
+            <ol v-if="suburbFeatures.length" class="ranking-list" aria-label="Suburb ranking">
+              <li
+                v-for="(feature, i) in rankedSuburbs"
+                :key="feature.properties.sal_code"
+                class="ranking-row"
+                :class="{ 'is-low-conf': feature.properties.low_confidence }"
+              >
+                <button
+                  type="button"
+                  class="ranking-row__btn"
+                  @click="handleRankingSelect(feature.properties.sal_code)"
+                  :aria-label="`Open ${feature.properties.suburb_name} on the map`"
+                >
+                  <span class="ranking-row__rank">{{ i + 1 }}</span>
+                  <span class="ranking-row__name">
+                    {{ feature.properties.suburb_name }}
+                    <small v-if="feature.properties.low_confidence" title="Small sample">small</small>
+                  </span>
+                  <span class="ranking-row__bar">
+                    <i
+                      :style="{
+                        width: (Math.abs((feature.properties.shvi_raw ?? 0) / rankingMaxValue) * 100) + '%',
+                        background: concernColorsMap[feature.properties.shvi_score ?? 0] ?? '#cccccc',
+                      }"
+                    />
+                  </span>
+                  <span class="ranking-row__value" :title="`SHVI raw: ${feature.properties.shvi_raw?.toFixed(3)}`">
+                    {{ feature.properties.shvi_score }}
+                    <small>/5</small>
+                  </span>
+                </button>
+              </li>
+              <li v-if="!rankedSuburbs.length" class="ranking-row ranking-row--empty">
+                <span>No suburbs match the current filter.</span>
+              </li>
+            </ol>
+            <div v-else class="patterns-card__loading" aria-live="polite">
+              <div v-for="i in 6" :key="i" class="skeleton-row" />
+              <span>Loading suburb data…</span>
+            </div>
+          </article>
+
+          <!-- RIGHT: "Where do older residents live?" key finding -->
+          <article class="patterns-card">
+            <header class="patterns-card__head">
+              <div>
+                <h3>Where older residents live</h3>
+                <p>Count of residents aged 65+ in each SHVI band — by far the biggest social-equity finding in this dataset.</p>
+              </div>
+            </header>
+
+            <div v-if="suburbFeatures.length" class="seniors-chart" aria-label="Older population distribution across SHVI bands">
+              <div
+                v-for="row in seniorsByBand"
+                :key="row.band"
+                class="seniors-chart__row"
+                :title="`Band ${row.band}: ${row.suburbs} suburbs, ${row.count.toLocaleString()} residents aged 65+`"
+              >
+                <span class="seniors-chart__label">
+                  Band {{ row.band }}
+                </span>
+                <span class="seniors-chart__bar">
+                  <i
+                    :style="{
+                      width: ((row.count / seniorsBandMax) * 100) + '%',
+                      background: concernColorsMap[row.band],
+                    }"
+                  />
+                </span>
+                <span class="seniors-chart__value">
+                  {{ row.count >= 1000 ? (row.count / 1000).toFixed(0) + 'k' : row.count.toLocaleString() }}
+                  <small>{{ row.pct.toFixed(0) }}%</small>
+                </span>
+              </div>
+            </div>
+            <div v-else class="patterns-card__loading">
+              <div v-for="i in 5" :key="i" class="skeleton-row skeleton-row--wide" />
+              <span>Loading band distribution…</span>
+            </div>
+
+            <div v-if="suburbFeatures.length" class="patterns-card__finding">
+              <strong>{{ totalSeniorsHigher }}%</strong>
+              <span>of Greater Melbourne residents aged 65+ live in heat-sensitive suburbs (bands 4 &amp; 5).</span>
+            </div>
+
+            <p class="patterns-card__caveat">
+              SEIFA-IRSD (socio-economic disadvantage) is the strongest single driver of the score — about three times stronger than satellite heat metrics. Where older people live who already face fewer resources is exactly where heat planning matters most.
+            </p>
+          </article>
+        </div>
       </section>
 
       <section v-if="showFollowupSections" ref="riskSection" class="story-section">
@@ -271,13 +511,13 @@ onBeforeUnmount(() => {
         <div class="story-section__copy" data-rise="section-head">
           <SectionKicker>Concern levels</SectionKicker>
           <h2>
-            <span>Understanding your <em>heat</em></span>
-            <small>vulnerability score.</small>
+            Reading
+            <span class="awareness-script">the bands.</span>
           </h2>
           <p>
-            Scores run from 1 to 5 and combine environmental conditions, population
-            sensitivity, and local support capacity. Tap a level to see what it means for
-            residents in that area.
+            Bands run from 1 to 5 and rank Greater Melbourne suburbs by how much extra
+            community attention older residents may benefit from on hot days. Tap a band
+            to see what life on a heat day typically looks like there.
           </p>
         </div>
 
@@ -360,6 +600,7 @@ onBeforeUnmount(() => {
 }
 
 .map-section,
+.patterns-section,
 .story-section,
 .action-section {
   position: relative;
@@ -378,6 +619,14 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, var(--brand-paper-white) 0%, #f7f2e8 100%);
 }
 
+.patterns-section {
+  padding-top: clamp(40px, 6vw, 80px);
+  padding-bottom: clamp(56px, 8vw, 92px);
+  background:
+    radial-gradient(circle at 20% 30%, rgba(155, 224, 111, 0.12), transparent 36%),
+    linear-gradient(180deg, #f7f2e8 0%, var(--brand-paper) 100%);
+}
+
 .story-section {
   background:
     radial-gradient(circle at 20% 30%, rgba(168, 212, 226, 0.18), transparent 32%),
@@ -391,6 +640,7 @@ onBeforeUnmount(() => {
 }
 
 .map-section__side,
+.patterns-section__side,
 .story-section__side,
 .action-section__side {
   position: absolute;
@@ -618,7 +868,7 @@ onBeforeUnmount(() => {
 
 .map-explainer__card {
   min-width: 0;
-  min-height: clamp(220px, 21vw, 250px);
+  min-height: clamp(260px, 22vw, 300px);
   border-radius: 22px;
   text-align: left;
   outline: none;
@@ -1135,6 +1385,378 @@ onBeforeUnmount(() => {
 
   .map-explainer__inner {
     transition: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Patterns section — Top suburbs ranking + key-finding chart
+   ════════════════════════════════════════════════════════════════════ */
+
+.patterns-section__intro {
+  max-width: 760px;
+  margin-bottom: clamp(28px, 4vw, 48px);
+}
+
+.patterns-section__intro h2 {
+  margin: 12px 0 14px;
+  color: var(--brand-ink);
+  font-family: var(--font-body);
+  font-size: clamp(2.4rem, 4.4vw, 3.8rem);
+  font-weight: 950;
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+}
+
+.patterns-section__intro p {
+  color: var(--brand-ink-muted);
+  font-size: 1.08rem;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.patterns-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: stretch;
+}
+
+.patterns-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: clamp(20px, 2.6vw, 28px);
+  border: 1px solid var(--brand-line);
+  border-radius: 28px;
+  background: rgba(255, 253, 248, 0.92);
+  box-shadow: 0 14px 32px rgba(35, 45, 39, 0.04);
+}
+
+.patterns-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.patterns-card__head h3 {
+  margin: 0 0 4px;
+  color: var(--brand-ink);
+  font-family: var(--font-body);
+  font-size: clamp(1.4rem, 2vw, 1.7rem);
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.patterns-card__head p {
+  margin: 0;
+  color: var(--brand-ink-muted);
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+/* — Toggle pills — */
+.patterns-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--brand-line);
+  border-radius: 999px;
+  background: rgba(251, 250, 247, 0.7);
+}
+
+.patterns-toggle button {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand-ink-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.patterns-toggle button.is-active {
+  background: var(--brand-ink);
+  color: var(--brand-paper-white);
+}
+
+.patterns-toggle button:hover:not(.is-active) {
+  background: rgba(228, 248, 213, 0.62);
+  color: var(--brand-ink-soft);
+}
+
+/* — "Include small suburbs" inline filter — */
+.patterns-card__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -6px;
+  color: var(--brand-ink-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.patterns-card__filter input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--shade-deep, #4f7a5c);
+}
+
+/* — Ranking list rows — */
+.ranking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ranking-row {
+  position: relative;
+}
+
+.ranking-row__btn {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1.3fr) minmax(120px, 2fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--brand-ink);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.ranking-row__btn:hover,
+.ranking-row__btn:focus-visible {
+  background: rgba(228, 248, 213, 0.42);
+  border-color: rgba(98, 133, 107, 0.22);
+}
+
+.ranking-row__rank {
+  color: var(--brand-ink-muted);
+  font-family: var(--font-body);
+  font-size: 1.04rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ranking-row__name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--brand-ink);
+  font-size: 1rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-row__name small {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(223, 167, 64, 0.18);
+  color: rgba(122, 75, 9, 0.96);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ranking-row__bar {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(35, 45, 39, 0.08);
+  overflow: hidden;
+}
+
+.ranking-row__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 380ms var(--ease-out-expo);
+}
+
+.ranking-row__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--brand-ink);
+  font-family: var(--font-body);
+  font-size: 1.12rem;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranking-row__value small {
+  color: var(--brand-ink-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ranking-row--empty {
+  padding: 16px;
+  border: 1px dashed var(--brand-line);
+  border-radius: 12px;
+  color: var(--brand-ink-muted);
+  font-size: 0.94rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+/* — Right card: seniors-by-band chart — */
+.seniors-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.seniors-chart__row {
+  display: grid;
+  grid-template-columns: 64px minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.seniors-chart__label {
+  color: var(--brand-ink-muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.seniors-chart__bar {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(35, 45, 39, 0.06);
+  overflow: hidden;
+}
+
+.seniors-chart__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 460ms var(--ease-out-expo);
+}
+
+.seniors-chart__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--brand-ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.seniors-chart__value small {
+  color: var(--brand-ink-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.patterns-card__finding {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-top: 6px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 86% 0%, rgba(201, 89, 73, 0.16), transparent 60%),
+    rgba(255, 244, 240, 0.86);
+}
+
+.patterns-card__finding strong {
+  color: var(--brand-ink);
+  font-family: var(--font-body);
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  font-weight: 950;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+}
+
+.patterns-card__finding span {
+  color: var(--brand-ink-muted);
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.42;
+}
+
+.patterns-card__caveat {
+  margin: 0;
+  padding: 0;
+  color: var(--brand-ink-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.55;
+  font-style: italic;
+}
+
+/* — Loading skeleton (shown until map emits dataLoaded) — */
+.patterns-card__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+  color: var(--brand-ink-muted);
+  font-size: 0.88rem;
+  font-weight: 650;
+  font-style: italic;
+  text-align: center;
+}
+
+.patterns-card__loading > span {
+  margin-top: 6px;
+  color: var(--brand-ink-muted);
+}
+
+.skeleton-row {
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(35, 45, 39, 0.06),
+    rgba(35, 45, 39, 0.12) 50%,
+    rgba(35, 45, 39, 0.06)
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.6s linear infinite;
+}
+
+.skeleton-row--wide {
+  height: 14px;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (max-width: 920px) {
+  .patterns-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ranking-row__btn {
+    grid-template-columns: 24px minmax(0, 1fr) minmax(80px, 1.4fr) auto;
+    gap: 10px;
   }
 }
 </style>
