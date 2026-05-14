@@ -664,6 +664,12 @@ onBeforeUnmount(() => {
             <i :style="{ background: concernColors[level] }" aria-hidden="true" />
             <span><b>{{ level }}</b> {{ concernLabels[level] }}</span>
           </div>
+          <div class="hvi-map__legend-overlay__row hvi-map__legend-overlay__row--uncertain">
+            <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+              <rect x="2" y="2" width="14" height="14" rx="5" />
+            </svg>
+            <span>Dashed = wider uncertainty</span>
+          </div>
         </div>
       </div>
 
@@ -680,7 +686,7 @@ onBeforeUnmount(() => {
             <span class="hvi-map__shvi-label">
               For older residents
               <InfoTip label="How this ranking is built">
-                Ranks Greater Melbourne suburbs by how much extra community attention residents aged 65+ may benefit from on hot days.
+                Ranks Greater Melbourne suburbs by how much extra community attention residents aged 65+ may need on hot days.
               </InfoTip>
             </span>
           </div>
@@ -775,9 +781,6 @@ onBeforeUnmount(() => {
         <div v-if="selectedFeature?.properties.older_population" class="hvi-map__stat-single">
           <span>
             People aged 65+ in this suburb
-            <InfoTip label="Where does this number come from?">
-              ABS 2021 Census, table G04. Sum of all residents aged 65 and over across the SA1 statistical areas that overlap this suburb — no filtering applied.
-            </InfoTip>
           </span>
           <strong>{{ selectedFeature.properties.older_population.toLocaleString() }}</strong>
           <small>Source: ABS 2021 Census</small>
@@ -1147,6 +1150,29 @@ onBeforeUnmount(() => {
   color: var(--brand-ink-muted);
   font-weight: 900;
   text-align: right;
+}
+
+.hvi-map__legend-overlay__row--uncertain {
+  margin-top: 3px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(35, 45, 39, 0.08);
+  color: var(--brand-ink-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.hvi-map__legend-overlay__row--uncertain svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.hvi-map__legend-overlay__row--uncertain rect {
+  fill: rgba(251, 250, 247, 0.88);
+  stroke: rgba(112, 112, 112, 0.9);
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
 }
 
 @media (max-width: 640px) {
