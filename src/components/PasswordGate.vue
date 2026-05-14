@@ -39,7 +39,7 @@ async function submit() {
       try {
         sessionStorage.setItem(SESSION_KEY, '1');
       } catch {
-        /* sessionStorage unavailable 鈥?still unlock for this view */
+        /* sessionStorage unavailable, still unlock for this view */
       }
       emit('unlock');
     } else {

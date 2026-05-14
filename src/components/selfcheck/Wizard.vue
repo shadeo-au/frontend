@@ -1,18 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { Icon } from '@iconify/vue';
 import AppButton from '@/components/AppButton.vue';
-import ClayCard from '@/components/ClayCard.vue';
-import WizardQuestion from './WizardQuestion.vue';
-import { gsap, prefersReducedMotion } from '@/lib/gsap';
-import type {
-  AreaProfile,
-  SelfCheckAnswers,
-  SuburbIndexEntry,
-} from '@/lib/selfcheck/types';
+import type { SelfCheckAnswers } from '@/lib/selfcheck/types';
 
 const props = defineProps<{
-  area: AreaProfile | null;
-  suburb: SuburbIndexEntry | null;
+  area: unknown;
+  suburb: unknown;
   answers: SelfCheckAnswers;
 }>();
 
@@ -21,470 +15,633 @@ const emit = defineEmits<{
   (e: 'submit'): void;
 }>();
 
-const stepLabels = ['Your area', 'Your health', 'Your home', 'Your support'];
-const step = ref(0);
-const progressEl = ref<HTMLElement | null>(null);
-let ctx: gsap.Context | undefined;
+type QuestionKey = 'q1' | 'q2' | 'q3' | 'q4' | 'q5' | 'q6' | 'q7' | 'q8' | 'q9';
 
-const a = computed(() => props.answers);
+interface Question {
+  key: QuestionKey;
+  number: string;
+  text: string;
+  icon: string;
+  helper?: string;
+  options: string[];
+}
 
-function patch<K extends keyof SelfCheckAnswers>(group: K, partial: Partial<SelfCheckAnswers[K]>) {
-  const next: SelfCheckAnswers = {
-    ...props.answers,
-    [group]: { ...props.answers[group], ...partial },
-  };
-  emit('update:answers', next);
+interface Step {
+  title: string;
+  subtitle: string;
+  questions: Question[];
+}
+
+const steps: Step[] = [
+  {
+    title: 'Part 1: Your Area',
+    subtitle: 'About your neighbourhood and outdoor exposure',
+    questions: [
+      {
+        key: 'q1',
+        number: 'Question 1 of 9',
+        text: 'Are there places nearby (within a 5-10 minute walk) where you can cool down?',
+        icon: 'material-symbols:park',
+        helper: 'Such as a park, shopping centre, or library',
+        options: ['Quite a few nearby', 'A few options', 'Hardly any'],
+      },
+      {
+        key: 'q2',
+        number: 'Question 2 of 9',
+        text: 'On very hot days, do you need to go outside?',
+        icon: 'material-symbols:directions-walk',
+        options: ['Rarely go out', 'Sometimes need to', 'Must go out often'],
+      },
+    ],
+  },
+  {
+    title: 'Part 2: Your Health',
+    subtitle: 'How your body responds to heat',
+    questions: [
+      {
+        key: 'q3',
+        number: 'Question 3 of 9',
+        text: 'Which age group are you in?',
+        icon: 'material-symbols:elderly',
+        options: ['65-74 years old', '75-84 years old', '85 years or older'],
+      },
+      {
+        key: 'q4',
+        number: 'Question 4 of 9',
+        text: "When it's very hot, do you often feel unwell?",
+        icon: 'material-symbols:thermometer',
+        helper: 'Such as dizziness, tiredness, or unusual thirst',
+        options: ['Rarely', 'Sometimes', 'Often'],
+      },
+    ],
+  },
+  {
+    title: 'Part 3: Your Home',
+    subtitle: 'Your ability to keep cool at home',
+    questions: [
+      {
+        key: 'q5',
+        number: 'Question 5 of 9',
+        text: 'Do you have cooling equipment at home?',
+        icon: 'material-symbols:mode-fan',
+        helper: 'Such as an air conditioner or fan',
+        options: ['Yes, and I use it regularly', 'Yes, but I rarely use it or find it tricky', 'No cooling equipment'],
+      },
+      {
+        key: 'q6',
+        number: 'Question 6 of 9',
+        text: 'On a hot day, how does your home usually feel?',
+        icon: 'material-symbols:device-thermostat',
+        options: ['Fairly cool and comfortable', 'A bit warm', 'Very hot and uncomfortable'],
+      },
+      {
+        key: 'q7',
+        number: 'Question 7 of 9',
+        text: 'If your home gets too hot, is there somewhere you can go to cool down?',
+        icon: 'material-symbols:location-on',
+        helper: 'Such as a shopping centre, library, or community centre',
+        options: ['Yes, I know exactly where to go', 'Not entirely sure', "No, I don't have anywhere"],
+      },
+    ],
+  },
+  {
+    title: 'Part 4: Your Support',
+    subtitle: 'The people around you during hot weather',
+    questions: [
+      {
+        key: 'q8',
+        number: 'Question 8 of 9',
+        text: 'Who do you currently live with?',
+        icon: 'material-symbols:group',
+        options: ['With family or a partner', 'Sometimes have company', 'I live alone'],
+      },
+      {
+        key: 'q9',
+        number: 'Question 9 of 9',
+        text: 'During hot weather, does someone check in on you?',
+        icon: 'material-symbols:phone-in-talk',
+        helper: 'By phone, message, or a visit',
+        options: ['Regularly', 'Occasionally', 'Rarely or never'],
+      },
+    ],
+  },
+];
+
+const stepTabs = ['Your Area', 'Your Health', 'Your Home', 'Your Support'];
+const step = reactive({ current: 0 });
+const selected = reactive<Record<QuestionKey, number | null>>({
+  q1: null,
+  q2: null,
+  q3: null,
+  q4: null,
+  q5: null,
+  q6: null,
+  q7: null,
+  q8: null,
+  q9: null,
+});
+
+const currentStep = computed(() => steps[step.current]);
+const isLast = computed(() => step.current === steps.length - 1);
+const stepValid = computed(() => currentStep.value.questions.every((q) => selected[q.key] !== null));
+const sectionBody = ref<HTMLElement | null>(null);
+
+watch(
+  () => step.current,
+  () => emit('update:answers', toSelfCheckAnswers()),
+);
+
+watch(
+  () => props.answers,
+  (answers) => {
+    const isReset = [
+      answers.personal.age_band,
+      answers.personal.prior_heat_discomfort,
+      answers.personal.mobility,
+      answers.home.has_ac,
+      answers.home.keeps_cool,
+      answers.home.knows_cool_place,
+      answers.social.lives_alone,
+      answers.social.check_in,
+      answers.social.knows_local_services,
+    ].every((value) => value === null);
+
+    if (!isReset) return;
+    step.current = 0;
+    Object.keys(selected).forEach((key) => {
+      selected[key as QuestionKey] = null;
+    });
+  },
+  { deep: true },
+);
+
+function choose(key: QuestionKey, value: number) {
+  selected[key] = value;
+  emit('update:answers', toSelfCheckAnswers());
 }
 
 function nextStep() {
-  if (step.value < stepLabels.length - 1) step.value += 1;
-  else emit('submit');
+  if (!stepValid.value) return;
+  if (isLast.value) {
+    emit('update:answers', toSelfCheckAnswers());
+    emit('submit');
+    return;
+  }
+  step.current += 1;
+  scrollToFirstQuestion();
 }
 
 function prevStep() {
-  if (step.value > 0) step.value -= 1;
+  if (step.current > 0) step.current -= 1;
 }
 
-const stepValid = computed(() => {
-  switch (step.value) {
-    case 0: return !!props.suburb;
-    case 1: {
-      const p = a.value.personal;
-      return !!(p.age_band && p.has_chronic && p.prior_heat_discomfort && p.takes_medication && p.mobility);
-    }
-    case 2: {
-      const h = a.value.home;
-      return !!(h.has_ac && h.keeps_cool && h.sun_exposure && h.upper_floor && h.knows_cool_place);
-    }
-    case 3: {
-      const s = a.value.social;
-      return !!(s.lives_alone && s.check_in && s.emergency_contact && s.comm_frequency && s.knows_local_services);
-    }
-    default: return false;
-  }
-});
+async function scrollToFirstQuestion() {
+  await nextTick();
+  const firstQuestion = sectionBody.value?.querySelector<HTMLElement>('.question-block');
+  if (!firstQuestion) return;
 
-const isLast = computed(() => step.value === stepLabels.length - 1);
-const progressPct = computed(() => `${((step.value + 1) / stepLabels.length) * 100}%`);
+  const top = firstQuestion.getBoundingClientRect().top + window.scrollY - 110;
+  window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+}
 
-const animateProgress = () => {
-  if (!progressEl.value) return;
-  gsap.to(progressEl.value, {
-    '--p': progressPct.value,
-    duration: prefersReducedMotion() ? 0 : 0.4,
-    ease: 'power3.out',
-  });
-};
+function toSelfCheckAnswers(): SelfCheckAnswers {
+  const q = (key: QuestionKey, fallback = 0) => selected[key] ?? fallback;
 
-onMounted(() => {
-  ctx = gsap.context(() => {
-    gsap.set(progressEl.value, { '--p': progressPct.value });
-  }, progressEl.value ?? undefined);
-});
-
-watch(step, animateProgress);
-
-onBeforeUnmount(() => {
-  ctx?.revert();
-});
+  return {
+    personal: {
+      age_band: q('q3') === 0 ? '65-74' : q('q3') === 1 ? '75-84' : '85+',
+      has_chronic: q('q4') === 2 ? 'yes' : q('q4') === 1 ? 'unsure' : 'no',
+      prior_heat_discomfort: q('q4') === 0 ? 'never' : q('q4') === 1 ? 'sometimes' : 'often',
+      takes_medication: 'unsure',
+      mobility: q('q2') === 0 ? 'no' : q('q2') === 1 ? 'a_little' : 'yes',
+    },
+    home: {
+      has_ac: q('q5') === 0 ? 'yes' : q('q5') === 1 ? 'fan_only' : 'no',
+      keeps_cool: q('q6') === 0 ? 'usually' : q('q6') === 1 ? 'sometimes' : 'rarely',
+      sun_exposure: q('q6') === 0 ? 'no' : q('q6') === 1 ? 'some' : 'many',
+      upper_floor: q('q6') === 2 ? 'yes' : 'no',
+      knows_cool_place: q('q7') === 0 ? 'yes' : q('q7') === 1 ? 'unsure' : 'no',
+    },
+    social: {
+      lives_alone: q('q8') === 0 ? 'no' : q('q8') === 1 ? 'sometimes' : 'yes',
+      check_in: q('q9') === 0 ? 'yes' : q('q9') === 1 ? 'sometimes' : 'no',
+      emergency_contact: q('q9') === 2 ? 'unsure' : 'yes',
+      comm_frequency: q('q9') === 0 ? 'daily' : q('q9') === 1 ? 'few_per_week' : 'rarely',
+      knows_local_services: q('q1') === 2 ? 'no' : q('q1') === 1 ? 'unsure' : 'yes',
+    },
+  };
+}
 </script>
 
 <template>
-  <ClayCard tone="white" radius="2xl" class="wizard">
-    <div class="wizard__head">
-      <div class="wizard__stepper">
-        <button
-          v-for="(label, i) in stepLabels"
-          :key="label"
-          type="button"
-          :class="['wizard__step', { 'is-active': i === step, 'is-done': i < step }]"
-          :disabled="i > step && !stepValid"
-          @click="step = i"
-        >
-          <span>{{ i + 1 }}</span>{{ label }}
-        </button>
-      </div>
-      <div ref="progressEl" class="wizard__progress"></div>
+  <div class="heat-check">
+    <div class="progress-strip" aria-label="Self-check progress">
+      <button
+        v-for="(item, i) in steps"
+        :key="item.title"
+        type="button"
+        :class="['progress-step', { active: i === step.current, done: i < step.current }]"
+        :disabled="i > step.current"
+        @click="step.current = i"
+      >
+        <span class="step-num">{{ i + 1 }}</span>
+        {{ stepTabs[i] }}
+      </button>
     </div>
 
-    <!-- Step 1: Area confirm -->
-    <div v-if="step === 0" class="wizard__body">
-      <h3 class="wizard__title">Confirm your area</h3>
-      <p class="wizard__lede">
-        We use your suburb only to estimate local heat exposure — never stored, never linked to you.
-      </p>
-      <ClayCard v-if="suburb" tone="sage" radius="lg">
-        <div class="confirm">
-          <div>
-            <small>Selected location</small>
-            <strong>{{ suburb.name }}, {{ suburb.state }} {{ suburb.postcode }}</strong>
-          </div>
-          <div v-if="area" class="confirm__score">
-            <small>Area exposure score</small>
-            <strong>{{ area.overall_location_exposure_score }} / 5</strong>
-          </div>
-          <div v-else class="confirm__score">
-            <small>Area exposure</small>
-            <strong>Not yet available</strong>
-          </div>
+    <section class="section-card" :aria-labelledby="`self-check-step-${step.current}`">
+      <header class="section-header">
+        <div class="section-icon" aria-hidden="true">
+          <span>{{ step.current + 1 }}</span>
         </div>
-      </ClayCard>
-      <p v-else class="wizard__warn">
-        Please choose a suburb above before continuing.
-      </p>
-    </div>
+        <div>
+          <h3 :id="`self-check-step-${step.current}`">{{ currentStep.title }}</h3>
+          <p>{{ currentStep.subtitle }}</p>
+        </div>
+      </header>
 
-    <!-- Step 2: Personal -->
-    <div v-else-if="step === 1" class="wizard__body">
-      <h3 class="wizard__title">Your health and sensitivity</h3>
-      <p class="wizard__lede">
-        Five short questions. There are no wrong answers, and "Not sure" is always an option.
-      </p>
+      <div ref="sectionBody" class="section-body">
+        <div
+          v-for="question in currentStep.questions"
+          :key="question.key"
+          class="question-block"
+        >
+          <div class="question-num">{{ question.number }}</div>
+          <fieldset>
+            <legend>
+              <span class="question-title-row">
+                <span class="question-icon" aria-hidden="true">
+                  <Icon :icon="question.icon" />
+                </span>
+                <span>
+                  {{ question.text }}
+                  <small v-if="question.helper">{{ question.helper }}</small>
+                </span>
+              </span>
+            </legend>
+            <div class="options">
+              <label
+                v-for="(option, index) in question.options"
+                :key="option"
+                :class="['option-label', { selected: selected[question.key] === index }]"
+              >
+                <input
+                  type="radio"
+                  :name="question.key"
+                  :value="index"
+                  :checked="selected[question.key] === index"
+                  @change="choose(question.key, index)"
+                />
+                <span class="option-dot" aria-hidden="true"></span>
+                <span class="option-icon" aria-hidden="true">{{ index + 1 }}</span>
+                <span>{{ option }}</span>
+              </label>
+            </div>
+          </fieldset>
+        </div>
 
-      <WizardQuestion
-        question="What is your age group?"
-        :model-value="a.personal.age_band"
-        @update:model-value="(v) => patch('personal', { age_band: v })"
-        :options="[
-          { value: '60-64', label: '60–64' },
-          { value: '65-74', label: '65–74' },
-          { value: '75-84', label: '75–84' },
-          { value: '85+',   label: '85 or over' },
-        ]"
-      />
+        <p v-if="!stepValid" class="error-msg">Please answer all questions before continuing.</p>
 
-      <WizardQuestion
-        question="Do you have any long-term health conditions?"
-        :model-value="a.personal.has_chronic"
-        @update:model-value="(v) => patch('personal', { has_chronic: v })"
-        :options="[
-          { value: 'no',          label: 'No' },
-          { value: 'yes',         label: 'Yes' },
-          { value: 'unsure',      label: 'Not sure' },
-          { value: 'prefer_not',  label: 'Prefer not to say' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Do you sometimes feel dizzy, weak, or very tired during hot weather?"
-        :model-value="a.personal.prior_heat_discomfort"
-        @update:model-value="(v) => patch('personal', { prior_heat_discomfort: v })"
-        :options="[
-          { value: 'never',     label: 'Never' },
-          { value: 'sometimes', label: 'Sometimes' },
-          { value: 'often',     label: 'Often' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Do you take regular medication?"
-        helper="Some medicines can affect how the body handles heat. If unsure, ask a GP or pharmacist."
-        :model-value="a.personal.takes_medication"
-        @update:model-value="(v) => patch('personal', { takes_medication: v })"
-        :options="[
-          { value: 'no',          label: 'No' },
-          { value: 'yes',         label: 'Yes' },
-          { value: 'unsure',      label: 'Not sure' },
-          { value: 'prefer_not',  label: 'Prefer not to say' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Do you have limited mobility or need walking assistance?"
-        :model-value="a.personal.mobility"
-        @update:model-value="(v) => patch('personal', { mobility: v })"
-        :options="[
-          { value: 'no',       label: 'No' },
-          { value: 'a_little', label: 'A little' },
-          { value: 'yes',      label: 'Yes' },
-        ]"
-      />
-    </div>
-
-    <!-- Step 3: Home -->
-    <div v-else-if="step === 2" class="wizard__body">
-      <h3 class="wizard__title">Your home and cooling</h3>
-      <p class="wizard__lede">
-        How well your home stays cool during the hottest part of the day.
-      </p>
-
-      <WizardQuestion
-        question="Do you have working air conditioning or a fan?"
-        :model-value="a.home.has_ac"
-        @update:model-value="(v) => patch('home', { has_ac: v })"
-        :options="[
-          { value: 'yes',      label: 'Yes, air conditioning' },
-          { value: 'fan_only', label: 'Fan only' },
-          { value: 'no',       label: 'No' },
-          { value: 'unsure',   label: 'Not sure' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Can you keep your home cool during hot afternoons?"
-        :model-value="a.home.keeps_cool"
-        @update:model-value="(v) => patch('home', { keeps_cool: v })"
-        :options="[
-          { value: 'usually',   label: 'Usually' },
-          { value: 'sometimes', label: 'Sometimes' },
-          { value: 'rarely',    label: 'Rarely' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Does strong sunlight enter your home during the hottest part of the day?"
-        :model-value="a.home.sun_exposure"
-        @update:model-value="(v) => patch('home', { sun_exposure: v })"
-        :options="[
-          { value: 'no',   label: 'No' },
-          { value: 'some', label: 'Some rooms' },
-          { value: 'many', label: 'Many rooms' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Do you live on an upper floor or in a home that becomes very hot?"
-        :model-value="a.home.upper_floor"
-        @update:model-value="(v) => patch('home', { upper_floor: v })"
-        :options="[
-          { value: 'no',     label: 'No' },
-          { value: 'yes',    label: 'Yes' },
-          { value: 'unsure', label: 'Not sure' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Do you know a cooler place nearby where you can go during very hot weather?"
-        :model-value="a.home.knows_cool_place"
-        @update:model-value="(v) => patch('home', { knows_cool_place: v })"
-        :options="[
-          { value: 'yes',    label: 'Yes' },
-          { value: 'unsure', label: 'Not sure' },
-          { value: 'no',     label: 'No' },
-        ]"
-      />
-    </div>
-
-    <!-- Step 4: Social -->
-    <div v-else class="wizard__body">
-      <h3 class="wizard__title">Support during hot days</h3>
-      <p class="wizard__lede">
-        Whether someone can check in with you on very hot days. There's no "right" answer here.
-      </p>
-
-      <WizardQuestion
-        question="Do you live alone?"
-        :model-value="a.social.lives_alone"
-        @update:model-value="(v) => patch('social', { lives_alone: v })"
-        :options="[
-          { value: 'no',  label: 'No' },
-          { value: 'yes', label: 'Yes' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Is there someone who checks on you during very hot days?"
-        :model-value="a.social.check_in"
-        @update:model-value="(v) => patch('social', { check_in: v })"
-        :options="[
-          { value: 'yes',       label: 'Yes' },
-          { value: 'sometimes', label: 'Sometimes' },
-          { value: 'no',        label: 'No' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Do you have a clear emergency contact saved or visible?"
-        :model-value="a.social.emergency_contact"
-        @update:model-value="(v) => patch('social', { emergency_contact: v })"
-        :options="[
-          { value: 'yes',         label: 'Yes' },
-          { value: 'unsure',      label: 'Not sure' },
-          { value: 'no',          label: 'No' },
-          { value: 'prefer_not',  label: 'Prefer not to say' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="How often do you talk to family, friends, neighbours, or carers?"
-        :model-value="a.social.comm_frequency"
-        @update:model-value="(v) => patch('social', { comm_frequency: v })"
-        :options="[
-          { value: 'daily',         label: 'Daily' },
-          { value: 'few_per_week',  label: 'A few times a week' },
-          { value: 'rarely',        label: 'Rarely' },
-        ]"
-      />
-
-      <WizardQuestion
-        question="Do you know any local services or community groups for older people?"
-        :model-value="a.social.knows_local_services"
-        @update:model-value="(v) => patch('social', { knows_local_services: v })"
-        :options="[
-          { value: 'yes',    label: 'Yes' },
-          { value: 'unsure', label: 'Not sure' },
-          { value: 'no',     label: 'No' },
-        ]"
-      />
-    </div>
-
-    <div class="wizard__nav">
-      <AppButton
-        v-if="step > 0"
-        variant="secondary"
-        @click="prevStep"
-      >Back</AppButton>
-      <span v-else></span>
-      <AppButton
-        variant="primary"
-        :disabled="!stepValid"
-        @click="nextStep"
-      >{{ isLast ? 'See my result' : 'Next' }}</AppButton>
-    </div>
-  </ClayCard>
+        <div class="btn-row">
+          <AppButton v-if="step.current > 0" variant="secondary" @click="prevStep">Back</AppButton>
+          <AppButton variant="primary" :disabled="!stepValid" @click="nextStep">
+            {{ isLast ? 'See My Results' : 'Next' }}
+          </AppButton>
+        </div>
+      </div>
+    </section>
+  </div>
 </template>
 
 <style scoped>
-.wizard {
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
+.heat-check {
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--brand-paper-white);
+  border: 1.5px solid var(--brand-line);
+  box-shadow: var(--brand-shadow-panel);
 }
 
-.wizard__head {
+.progress-strip {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  align-items: stretch;
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1.5px solid var(--brand-line);
 }
 
-.wizard__stepper {
+.progress-step {
+  flex: 1 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.wizard__step {
-  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 8px 18px 8px 8px;
-  border-radius: 999px;
-  background: rgba(35, 45, 39, 0.05);
+  gap: 10px;
+  min-height: 62px;
+  padding: 14px 20px;
   color: var(--brand-ink-muted);
-  font-size: 0.95rem;
+  border-bottom: 3px solid transparent;
+  font-size: 1rem;
   font-weight: 800;
-  letter-spacing: 0;
-  cursor: pointer;
-  border: 0;
-  transition: background var(--d-fast) ease, color var(--d-fast) ease;
+  white-space: nowrap;
+  transition: color var(--d-fast) ease, border-color var(--d-fast) ease, background var(--d-fast) ease;
 }
-.wizard__step span {
+
+.progress-step.active {
+  color: var(--shade-deep);
+  border-bottom-color: var(--brand-lime-hover);
+  background: rgba(155, 224, 111, 0.12);
+}
+
+.progress-step.done {
+  color: var(--brand-sage);
+}
+
+.progress-step:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
+.step-num {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(35, 45, 39, 0.1);
+  color: var(--brand-ink-muted);
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.progress-step.active .step-num {
+  background: var(--shade-deep);
+  color: #fff;
+}
+
+.progress-step.done .step-num {
+  background: var(--brand-lime-soft);
+  color: var(--shade-deep);
+}
+
+.section-card {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 32px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(190, 238, 139, 0.34), transparent 36%),
+    linear-gradient(135deg, #31483a 0%, #4f7958 54%, #82aa73 100%);
+}
+
+.section-icon {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.section-icon span {
   width: 32px;
   height: 32px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(35, 45, 39, 0.12);
-  font-weight: 900;
-}
-.wizard__step.is-done {
-  background: var(--brand-lime-soft);
-  color: var(--shade-deep);
-}
-.wizard__step.is-done span { background: var(--brand-sage); color: #fff; }
-.wizard__step.is-active {
-  background: var(--brand-ink-soft);
-  color: #fff;
-}
-.wizard__step.is-active span { background: var(--brand-lime); color: #142016; }
-.wizard__step:disabled { cursor: not-allowed; opacity: 0.7; }
-
-.wizard__progress {
-  position: relative;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(35, 45, 39, 0.08);
-  overflow: hidden;
-}
-.wizard__progress::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: var(--p, 25%);
-  background: linear-gradient(90deg, var(--brand-lime), var(--brand-sage));
-  border-radius: 999px;
-}
-
-.wizard__body {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-.wizard__title {
-  color: var(--brand-ink);
-  font-family: var(--font-body);
-  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  background: var(--brand-lime);
+  color: #142016;
   font-weight: 950;
-  line-height: 1.15;
+}
+
+.section-header h3 {
+  color: #fff;
+  font-family: var(--font-editorial);
+  font-size: clamp(1.45rem, 2.1vw, 1.75rem);
+  font-weight: 600;
   letter-spacing: 0;
 }
 
-.wizard__lede {
-  color: var(--brand-ink-muted);
-  font-size: 1.0625rem;
-  font-weight: 600;
-  line-height: 1.55;
-  max-width: 56ch;
+.section-header p {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.98rem;
+  font-weight: 500;
 }
 
-.wizard__warn {
-  padding: 14px 18px;
-  border-radius: 16px;
-  background: var(--peach-soft);
-  color: #8b3f25;
-  font-weight: 800;
-  font-size: 1rem;
+.section-body {
+  padding: clamp(24px, 4vw, 34px);
 }
 
-.confirm {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
+.question-block {
+  padding-bottom: 32px;
+  margin-bottom: 32px;
+  border-bottom: 1.5px solid var(--brand-line-soft);
 }
-.confirm small {
-  display: block;
-  color: var(--brand-ink-muted);
-  font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+
+.question-block:last-of-type {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.question-num {
+  margin-bottom: 8px;
+  color: var(--brand-sage);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.confirm strong {
-  display: block;
-  color: var(--brand-ink-soft);
-  font-size: 1.4rem;
-  font-weight: 900;
-  margin-top: 2px;
-}
-.confirm__score {
-  text-align: right;
+
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
 }
 
-.wizard__nav {
+legend {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+  color: var(--brand-ink);
+  font-family: var(--font-editorial);
+  font-size: clamp(1.22rem, 1.5vw, 1.42rem);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.question-title-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.question-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--brand-lime-soft);
+  color: var(--shade-deep);
+  font-size: 1.45rem;
+}
+
+legend small {
+  display: block;
+  margin-top: 4px;
+  color: var(--brand-ink-muted);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.option-label {
+  display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 4px;
+  min-height: 66px;
+  padding: 15px 20px;
+  border: 1.5px solid var(--brand-line);
+  border-radius: 14px;
+  background: var(--brand-paper-white);
+  color: var(--brand-ink-soft);
+  font-size: 1.06rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background var(--d-fast) ease,
+    border-color var(--d-fast) ease,
+    color var(--d-fast) ease,
+    transform var(--d-fast) var(--ease-out-expo);
 }
 
-@media (max-width: 640px) {
-  .wizard__nav {
+.option-label:hover {
+  transform: translateY(-1px);
+  border-color: rgba(91, 140, 97, 0.36);
+  background: rgba(228, 248, 213, 0.38);
+}
+
+.option-label.selected {
+  border-color: rgba(91, 140, 97, 0.72);
+  background: var(--brand-lime-soft);
+  color: var(--shade-deep);
+}
+
+.option-label input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.option-dot {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(35, 45, 39, 0.24);
+  background: #fff;
+  position: relative;
+}
+
+.option-label.selected .option-dot {
+  border-color: var(--shade-deep);
+  background: var(--shade-deep);
+}
+
+.option-label.selected .option-dot::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.option-icon {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(98, 133, 107, 0.12);
+  color: var(--brand-sage);
+  font-size: 0.95rem;
+  font-weight: 950;
+}
+
+.option-label.selected .option-icon {
+  background: rgba(91, 140, 97, 0.18);
+  color: var(--shade-deep);
+}
+
+.option-label:focus-within {
+  box-shadow: inset 0 0 0 2px var(--brand-sage);
+  border-color: var(--brand-sage);
+}
+
+.error-msg {
+  margin-top: 20px;
+  color: var(--alert);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.btn-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 680px) {
+  .progress-step {
+    flex-basis: auto;
+    min-height: 54px;
+    padding: 12px 14px;
+    font-size: 0.92rem;
+  }
+
+  .section-header {
+    padding: 24px 20px;
+  }
+
+  .section-body {
+    padding: 24px 20px;
+  }
+
+  .option-label {
+    align-items: flex-start;
+    padding: 15px 16px;
+  }
+
+  .question-title-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .question-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 1.25rem;
+  }
+
+  .btn-row {
     flex-direction: column-reverse;
-    align-items: stretch;
   }
 }
 </style>

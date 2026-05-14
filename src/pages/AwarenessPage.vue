@@ -821,6 +821,21 @@ onBeforeUnmount(() => {
           </article>
         </div>
       </section>
+
+      <footer class="awareness-footer">
+        <div class="awareness-footer__inner">
+          <p class="awareness-footer__safety">
+            <strong>Safety:</strong> This map is for awareness and planning only. It does not predict
+            individual health outcomes or replace official heat-health advice. If you feel dizzy,
+            confused, weak, very thirsty, or unwell during hot weather, seek medical help. In an
+            emergency, call <strong>000</strong>.
+          </p>
+          <p>
+            <strong>Data source:</strong> DELWP Urban Heat Islands and Heat Vulnerability Assessment
+            in Melbourne, 2018.
+          </p>
+        </div>
+      </footer>
     </main>
   </div>
 </template>
@@ -829,6 +844,40 @@ onBeforeUnmount(() => {
 .awareness-page {
   min-height: 100vh;
   background: var(--brand-paper-white);
+}
+
+.awareness-footer {
+  background: var(--brand-ink-soft);
+  color: var(--brand-paper);
+  padding: clamp(40px, 6vw, 72px) 0;
+}
+
+.awareness-footer__inner {
+  width: min(100% - var(--gutter) * 2, 1180px);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.awareness-footer p {
+  max-width: 88ch;
+  color: rgba(248, 241, 227, 0.85);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.awareness-footer strong {
+  color: var(--brand-paper-white);
+  font-weight: 900;
+}
+
+.awareness-footer__safety {
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(248, 241, 227, 0.18);
 }
 
 .map-section,

@@ -127,10 +127,7 @@ onBeforeUnmount(() => {
         image-src="/why-hero-new.png"
         image-alt="An older woman stands in a warm park beside shaded paths, a health checklist, and a local heat map."
       >
-        <h1>
-          Heat hits <span>harder</span>
-          <small>as we age.</small>
-        </h1>
+        <h1>Heat hits harder as we age.</h1>
       </HeroFullSection>
 
       <section id="why-risk" class="risk-story">
@@ -331,6 +328,26 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
+      <footer class="why-footer">
+        <div class="why-footer__inner">
+          <p class="why-footer__safety">
+            <strong>Safety:</strong> Shadeo explains heat risk patterns and planning options. It does
+            not replace medical advice. If you feel dizzy, confused, weak, very thirsty, or unwell
+            during hot weather, seek medical help. In an emergency, call <strong>000</strong>.
+          </p>
+          <div class="why-footer__sources">
+            <strong>Data sources:</strong>
+            <ul>
+              <li>AIHW (2023). Let's talk about the weather: injuries related to extreme weather. aihw.gov.au</li>
+              <li>AIHW (2024). Australia's Health 2024: Extreme weather related injuries. aihw.gov.au</li>
+              <li>Department of Health, Victoria (2024). Research and reports - extreme heat and heatwaves. health.vic.gov.au</li>
+              <li>Department of Health, Victoria (2026). Increased heat-related health risks - Health Advisory #260127. health.vic.gov.au</li>
+              <li>eSafety Commissioner (2018). Digital behaviours of older Australians: digital confidence. esafety.gov.au</li>
+            </ul>
+          </div>
+        </div>
+      </footer>
+
 
     </main>
   </div>
@@ -342,6 +359,50 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   color: var(--brand-ink);
   background: var(--brand-paper-white);
+}
+
+.why-footer {
+  background: var(--brand-ink-soft);
+  color: var(--brand-paper);
+  padding: clamp(40px, 6vw, 72px) 0;
+}
+
+.why-footer__inner {
+  width: min(100% - var(--gutter) * 2, 1180px);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.why-footer p,
+.why-footer__sources {
+  max-width: 96ch;
+  color: rgba(248, 241, 227, 0.85);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.why-footer strong {
+  color: var(--brand-paper-white);
+  font-weight: 900;
+}
+
+.why-footer__safety {
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(248, 241, 227, 0.18);
+}
+
+.why-footer__sources ul {
+  margin: 10px 0 0;
+  padding-left: 1.15rem;
+}
+
+.why-footer__sources li + li {
+  margin-top: 4px;
 }
 
 
@@ -364,39 +425,22 @@ onBeforeUnmount(() => {
 }
 
 .why-hero :deep(.hero-full__copy) {
-  width: min(48vw, 680px);
+  width: min(100%, 980px);
   margin-left: auto;
-  margin-right: clamp(42px, 6vw, 118px);
+  margin-right: auto;
   padding: clamp(24px, 4vw, 54px) 0;
   text-align: center;
 }
 
 .why-hero :deep(h1) {
-  color: #2f3832;
-  font-family: var(--font-editorial);
-  font-size: clamp(2.35rem, 3.75vw, 4.45rem);
-  font-weight: 400;
-  line-height: 1.08;
-  text-shadow: none;
-}
-
-.why-hero :deep(h1 span) {
-  display: inline-block;
-  margin-inline: 0.08em;
-  color: var(--shade-deep);
-  font-family: var(--font-script);
-  font-size: 1.04em;
-  font-weight: 700;
-  line-height: 0.78;
-  transform: rotate(-1.5deg);
-}
-
-.why-hero :deep(h1 small) {
-  display: block;
-  margin-top: 0.12em;
-  color: #2f3832;
-  font: inherit;
-  font-size: 0.82em;
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: var(--brand-fs-hero);
+  font-weight: 950;
+  line-height: 1.04;
+  letter-spacing: 0;
+  text-wrap: balance;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.28);
 }
 
 
@@ -1076,9 +1120,10 @@ onBeforeUnmount(() => {
 
   .why-hero :deep(.hero-full__copy) {
     width: min(100%, 680px);
-    margin-left: 0;
+    margin-left: auto;
+    margin-right: auto;
     padding: 0;
-    text-align: left;
+    text-align: center;
   }
 
   .why-hero :deep(.hero-full__art img) {
@@ -1087,7 +1132,9 @@ onBeforeUnmount(() => {
   }
 
   .why-hero :deep(h1) {
-    font-size: clamp(2.25rem, 8vw, 3.8rem);
+    font-size: clamp(2.85rem, 11vw, 5.25rem);
+    color: var(--brand-ink);
+    text-shadow: none;
   }
 
   .risk-story {
@@ -1170,11 +1217,12 @@ onBeforeUnmount(() => {
   }
 
   .why-hero :deep(.hero-full__copy) {
-    text-align: left;
+    text-align: center;
   }
 
   .why-hero :deep(h1) {
-    font-size: clamp(2.05rem, 10vw, 3.1rem);
+    font-size: clamp(2.5rem, 12vw, 3.8rem);
+    line-height: 1.06;
   }
 
   .risk-story {

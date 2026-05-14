@@ -64,7 +64,7 @@ export interface HomeAnswers {
 }
 
 export interface SocialAnswers {
-  lives_alone: 'yes' | 'no' | null;
+  lives_alone: 'yes' | 'no' | 'sometimes' | null;
   check_in: 'yes' | 'sometimes' | 'no' | null;
   emergency_contact: YesNoUnsure | null;
   comm_frequency: CommFreq | null;
