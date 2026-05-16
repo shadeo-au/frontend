@@ -428,16 +428,62 @@
         </div>
 
         <div class="planner-readiness-block planner-weather-card">
-          <div class="planner-readiness-title-row">
-            <h3>Weather before you leave</h3>
-            <span v-if="weather.isLoading">Checking weather...</span>
+          <div class="planner-weather-brief-head">
+            <div>
+              <h3>Weather before you leave</h3>
+              <p>Intelligent pre-departure briefing for your journey.</p>
+            </div>
+            <span class="planner-weather-ai-badge">
+              <Icon icon="material-symbols:verified-rounded" aria-hidden="true" />
+              AI verified
+            </span>
           </div>
-          <p class="planner-readiness-advice" :class="{ unwell: weatherAdvice.tone === 'caution' }">
-            {{ weatherAdvice.message }}
-          </p>
-          <ul class="planner-comfort-notes">
-            <li v-for="note in weatherAdvice.items" :key="note">{{ note }}</li>
-          </ul>
+
+          <div v-if="weather.isLoading" class="planner-weather-loading" aria-label="Loading weather guidance">
+            <section class="planner-weather-summary-skeleton">
+              <span></span>
+              <div>
+                <strong></strong>
+                <small></small>
+              </div>
+            </section>
+            <div class="planner-weather-factor-grid">
+              <article v-for="index in 3" :key="index" class="planner-weather-factor-skeleton">
+                <span></span>
+                <em></em>
+                <strong></strong>
+                <small></small>
+              </article>
+            </div>
+          </div>
+
+          <template v-else>
+            <section class="planner-weather-summary-card" :class="weatherAdvice.tone">
+              <span class="planner-weather-summary-icon" aria-hidden="true">
+                <Icon :icon="weatherStatusIcon(weatherAdvice.tone)" />
+              </span>
+              <div>
+                <strong>{{ weatherAdvice.label }}</strong>
+                <span>{{ weatherAdvice.summary }}</span>
+                <small>{{ weatherUpdatedText }}</small>
+              </div>
+            </section>
+
+            <div v-if="weatherFactorCards.length" class="planner-weather-factor-grid">
+              <article
+                v-for="card in weatherFactorCards"
+                :key="card.key"
+                class="planner-weather-factor-card"
+                :class="card.tone"
+              >
+                <div class="planner-weather-factor-top">
+                  <Icon :icon="card.icon" aria-hidden="true" />
+                  <span>{{ card.label }}</span>
+                </div>
+                <strong>{{ card.title }}</strong>
+              </article>
+            </div>
+          </template>
         </div>
 
         <div class="planner-readiness-block">
@@ -771,7 +817,8 @@ const visibleStep = ref(1)
 const maxReachableStep = ref(1)
 
 const readiness = reactive({ tripItems: [], essentials: [] })
-const weather = reactive({ isLoading: false, error: '', current: null, daily: null })
+const weather = reactive({ isLoading: false, error: '', suitability: null })
+const tripDate = ref('today')
 const shoppingInput = ref('')
 const shoppingItems = ref([])
 const result = reactive({
@@ -988,62 +1035,74 @@ const scoreBreakdownRows = computed(() => [
 const destinationChecklist = computed(() => destinationChecklistByType[destinationKind.value] || destinationChecklistByType.default)
 const destinationChecklistIntro = computed(() => destinationChecklist.value.intro)
 const destinationChecklistItems = computed(() => destinationChecklist.value.items)
-const weatherCodeLabel = (code) => {
-  if ([0, 1].includes(code)) return 'mostly clear'
-  if ([2, 3].includes(code)) return 'cloudy'
-  if ([45, 48].includes(code)) return 'foggy'
-  if ([51, 53, 55, 56, 57].includes(code)) return 'drizzly'
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rainy'
-  if ([95, 96, 99].includes(code)) return 'stormy'
-  return 'changeable'
+const weatherSuitabilityTone = (label) => {
+  if (label === 'Not Recommended') return 'danger'
+  if (label === 'Caution') return 'caution'
+  return 'normal'
+}
+const weatherStatusIcon = (tone) => {
+  if (tone === 'danger') return 'material-symbols:do-not-disturb-on-rounded'
+  if (tone === 'caution') return 'material-symbols:warning-rounded'
+  if (tone === 'unavailable') return 'material-symbols:cloud-off-rounded'
+  return 'material-symbols:check-circle-outline-rounded'
 }
 const weatherAdvice = computed(() => {
   if (weather.isLoading) {
     return {
       tone: 'normal',
-      message: 'Checking the latest weather for your starting area.',
+      label: 'Checking weather',
+      summary: 'Checking the latest weather for your starting area.',
       items: ['Please wait a moment before you leave.']
     }
   }
-  if (weather.error || !weather.current) {
+  if (weather.error || !weather.suitability) {
     return {
-      tone: 'normal',
-      message: 'Weather advice is not available right now.',
+      tone: 'unavailable',
+      label: 'Weather unavailable',
+      summary: 'Weather advice is not available right now.',
       items: ['Please check the sky before leaving.', 'Bring water and sun or rain protection if needed.']
     }
   }
-  const temperature = Math.round(Number(weather.current.temperature_2m))
-  const apparent = Math.round(Number(weather.current.apparent_temperature))
-  const wind = Math.round(Number(weather.current.wind_speed_10m))
-  const precipitation = Number(weather.current.precipitation ?? weather.current.rain ?? 0)
-  const dailyRainChance = Number(weather.daily?.precipitation_probability_max?.[0])
-  const code = Number(weather.current.weather_code)
-  const items = []
-  let tone = 'normal'
-
-  if (temperature >= 28 || apparent >= 30) {
-    tone = 'caution'
-    items.push('It may feel warm. Take water, wear a hat, and rest in shade when you can.')
-  } else if (temperature <= 12) {
-    items.push('It may feel cool. A warm layer can make the walk more comfortable.')
-  } else {
-    items.push('The temperature looks comfortable for a short walk.')
-  }
-  if (precipitation > 0 || dailyRainChance >= 40 || [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) {
-    tone = 'caution'
-    items.push('Rain is possible. Bring an umbrella or rain jacket, and take care on wet paths.')
-  }
-  if (wind >= 28) {
-    tone = 'caution'
-    items.push('It may be windy. Walk slowly and avoid carrying loose items.')
-  }
-  items.push('If the weather changes, it is okay to pause or choose another time.')
+  const suitability = weather.suitability
+  const items = Array.isArray(suitability.mainFactors) ? [...suitability.mainFactors] : []
 
   return {
-    tone,
-    message: `Current weather looks ${weatherCodeLabel(code)}, about ${temperature} degrees Celsius.`,
+    tone: weatherSuitabilityTone(suitability.label),
+    label: suitability.uiLabel || suitability.label || 'Weather guidance ready',
+    summary: suitability.summary || 'Weather guidance is ready for this trip.',
     items
   }
+})
+const weatherUpdatedText = computed(() => {
+  const date = weather.suitability?.date
+  if (!date) return weather.isLoading ? 'Updating now.' : 'Based on current trip details.'
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return 'Based on current trip details.'
+  const formatted = new Intl.DateTimeFormat('en-AU', { month: 'short', day: 'numeric' }).format(parsed)
+  return `Forecast guidance for ${formatted}.`
+})
+const weatherFactorCards = computed(() => {
+  return weatherAdvice.value.items.map((factor, index) => {
+    const text = String(factor || '').trim()
+    const lower = text.toLowerCase()
+    let icon = 'material-symbols:info-outline-rounded'
+
+    if (/(temp|heat|warm|hot|cool|cold)/.test(lower)) {
+      icon = 'material-symbols:device-thermostat'
+    } else if (/(rain|rainfall|precip|wet|storm|drizzle)/.test(lower)) {
+      icon = 'material-symbols:water-drop'
+    } else if (/wind/.test(lower)) {
+      icon = 'material-symbols:air-rounded'
+    }
+
+    return {
+      key: `factor-${index}-${text}`,
+      label: `Factor ${index + 1}`,
+      icon,
+      title: text,
+      tone: 'normal'
+    }
+  })
 })
 const readinessRouteAlerts = computed(() => [
   'This route may include comfort markers for benches, toilets, and drinking fountains.',
@@ -1434,32 +1493,33 @@ const searchPlaces = async (query) => {
   }
 }
 let weatherRequestKey = ''
-const weatherEndpoint = (place) => {
-  const url = new URL('https://api.open-meteo.com/v1/forecast')
-  url.searchParams.set('latitude', place.lat)
-  url.searchParams.set('longitude', place.lng)
-  url.searchParams.set('current', 'temperature_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m')
-  url.searchParams.set('daily', 'weather_code,temperature_2m_max,precipitation_probability_max')
-  url.searchParams.set('timezone', 'auto')
-  return url.toString()
-}
+const weatherSuitabilityEndpoint = 'https://d22z6whz3d.execute-api.ap-southeast-2.amazonaws.com/api/weather-suitability'
 const loadWeatherForStart = async () => {
   const place = selectedStart.value
   if (!place?.lat || !place?.lng) return
-  const requestKey = `${place.lat},${place.lng}`
-  if (weatherRequestKey === requestKey && (weather.current || weather.isLoading)) return
+  const requestKey = `${tripDate.value}:${place.lat},${place.lng}`
+  if (weatherRequestKey === requestKey && (weather.suitability || weather.isLoading)) return
   weatherRequestKey = requestKey
   weather.isLoading = true
   weather.error = ''
   try {
-    const response = await fetch(weatherEndpoint(place))
+    const response = await fetch(weatherSuitabilityEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tripDate: tripDate.value,
+        startingPoint: {
+          lat: Number(place.lat),
+          lng: Number(place.lng),
+          label: place.name || place.address || 'Selected starting point'
+        }
+      })
+    })
     const payload = await readJsonResponse(response)
     if (!response.ok) throw new Error('Weather advice is not available right now.')
-    weather.current = payload.current || null
-    weather.daily = payload.daily || null
+    weather.suitability = payload || null
   } catch (error) {
-    weather.current = null
-    weather.daily = null
+    weather.suitability = null
     weather.error = 'Weather advice is not available right now.'
   } finally {
     weather.isLoading = false
@@ -4037,6 +4097,300 @@ onBeforeUnmount(() => {
   font-size: 1.35rem;
   font-weight: 950;
   letter-spacing: 0;
+}
+
+.planner-weather-card {
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.planner-weather-brief-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.planner-weather-brief-head h3 {
+  margin-bottom: 6px;
+  font-size: clamp(1.35rem, 2.2vw, 1.72rem);
+}
+
+.planner-weather-brief-head p {
+  margin: 0;
+  color: var(--brand-ink-muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.planner-weather-ai-badge {
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  background: #e8f3e9;
+  color: #5f7a65;
+  font-size: 0.72rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.planner-weather-ai-badge svg {
+  width: 15px;
+  height: 15px;
+}
+
+.planner-weather-summary-card {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid rgba(185, 216, 188, 0.66);
+  border-radius: 12px;
+  background: #e8f6e9;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  color: var(--brand-ink-soft);
+}
+
+.planner-weather-summary-card.caution {
+  border-color: rgba(239, 166, 43, 0.32);
+  background: #fff5dc;
+}
+
+.planner-weather-summary-card.danger {
+  border-color: rgba(194, 82, 68, 0.28);
+  background: #fff0ed;
+}
+
+.planner-weather-summary-card.unavailable {
+  border-color: rgba(103, 113, 110, 0.18);
+  background: #f4f5f4;
+}
+
+.planner-weather-summary-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.58);
+  color: #657a69;
+}
+
+.planner-weather-summary-card.caution .planner-weather-summary-icon {
+  color: #8a651c;
+}
+
+.planner-weather-summary-card.danger .planner-weather-summary-icon {
+  color: #9a3b30;
+}
+
+.planner-weather-summary-card.unavailable .planner-weather-summary-icon {
+  color: #68716e;
+}
+
+.planner-weather-summary-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.planner-weather-summary-card div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.planner-weather-summary-card strong,
+.planner-weather-summary-card span,
+.planner-weather-summary-card small {
+  overflow-wrap: anywhere;
+}
+
+.planner-weather-summary-card strong {
+  font-size: 1.02rem;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.planner-weather-summary-card span {
+  color: var(--brand-ink-muted);
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.planner-weather-summary-card small {
+  color: #6f816f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.planner-weather-loading {
+  display: grid;
+  gap: 20px;
+}
+
+.planner-weather-summary-skeleton {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid rgba(185, 216, 188, 0.44);
+  border-radius: 12px;
+  background: rgba(244, 251, 245, 0.88);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+}
+
+.planner-weather-summary-skeleton span,
+.planner-weather-summary-skeleton strong,
+.planner-weather-summary-skeleton small,
+.planner-weather-factor-skeleton span,
+.planner-weather-factor-skeleton em,
+.planner-weather-factor-skeleton strong,
+.planner-weather-factor-skeleton small {
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, #dfe4e6 0%, #eef1f2 42%, #dfe4e6 82%);
+  background-size: 240% 100%;
+  animation: planner-weather-shimmer 1.4s ease-in-out infinite;
+}
+
+.planner-weather-summary-skeleton > span {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+}
+
+.planner-weather-summary-skeleton div {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+}
+
+.planner-weather-summary-skeleton strong {
+  width: min(100%, 520px);
+  height: 24px;
+}
+
+.planner-weather-summary-skeleton small {
+  width: min(42%, 220px);
+  height: 16px;
+}
+
+.planner-weather-factor-grid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.planner-weather-factor-card {
+  margin-top: 20px;
+  min-height: 138px;
+  padding: 20px;
+  border: 1px solid rgba(35, 45, 39, 0.04);
+  border-radius: 10px;
+  background: #f4f5f6;
+  display: grid;
+  align-content: space-between;
+  gap: 14px;
+}
+
+.planner-weather-factor-card.caution {
+  border-color: rgba(239, 166, 43, 0.18);
+  background: #fffaf0;
+}
+
+.planner-weather-factor-card.danger {
+  border-color: rgba(194, 82, 68, 0.18);
+  background: #fff6f4;
+}
+
+.planner-weather-factor-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planner-weather-factor-top svg {
+  width: 22px;
+  height: 22px;
+  color: #6a7774;
+}
+
+.planner-weather-factor-card.blue .planner-weather-factor-top svg {
+  color: #1c80e8;
+}
+
+.planner-weather-factor-card.caution .planner-weather-factor-top svg {
+  color: #9a6a12;
+}
+
+.planner-weather-factor-card.danger .planner-weather-factor-top svg {
+  color: #9a3b30;
+}
+
+.planner-weather-factor-top span {
+  color: #68716e;
+  font-size: 0.66rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.planner-weather-factor-card strong {
+  color: var(--brand-ink-soft);
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.planner-weather-factor-skeleton {
+  min-height: 138px;
+  padding: 20px;
+  border: 1px solid rgba(35, 45, 39, 0.04);
+  border-radius: 10px;
+  background: #f4f5f6;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-content: space-between;
+  gap: 16px;
+}
+
+.planner-weather-factor-skeleton span {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.planner-weather-factor-skeleton em {
+  width: 42px;
+  height: 12px;
+  align-self: center;
+}
+
+.planner-weather-factor-skeleton strong {
+  grid-column: 1 / -1;
+  width: min(72%, 160px);
+  height: 24px;
+}
+
+.planner-weather-factor-skeleton small {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 3px;
+}
+
+@keyframes planner-weather-shimmer {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
 }
 
 .planner-readiness-title-row {
