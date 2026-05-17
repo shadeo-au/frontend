@@ -6,6 +6,7 @@ import BrandWatermark from '../components/BrandWatermark.vue';
 import SectionKicker from '../components/SectionKicker.vue';
 import HeroFullSection from '../components/HeroFullSection.vue';
 import HviCanvasMap from '../components/awareness/HviCanvasMap.vue';
+import AppFooter from '../components/AppFooter.vue';
 import { gsap, prefersReducedMotion, ScrollTrigger } from '../lib/gsap';
 
 type ExplainerKey = 'shows' | 'built' | 'use';
@@ -135,21 +136,21 @@ const mapExplainers: Array<{
     number: '01',
     title: 'What it shows',
     eyebrow: 'What it shows',
-    body: 'A 1-to-5 rank of Greater Melbourne suburbs. A higher band means the area\'s older residents are more likely to need extra community support on hot days. Relative within the city.',
+    body: 'Every Greater Melbourne suburb gets a heat-sensitivity score from 1 to 5. A higher score means older residents living there may need more support on hot days. Scores compare suburbs with each other — they are not an absolute danger rating.',
   },
   {
     key: 'built',
     number: '02',
     title: 'How it is built',
     eyebrow: 'How it is built',
-    body: 'Three factors: heat in the area, older residents at risk, and lack of local support. Computed per statistical area, then aggregated to suburbs by 65+ population.',
+    body: 'Each suburb\'s score combines three things: how hot the area gets, how many older residents may be more affected by heat, and how much local support is available. Suburbs with more residents aged 65+ count for more in the score.',
   },
   {
     key: 'use',
     number: '03',
     title: 'How to use it',
     eyebrow: 'How to use it',
-    body: 'Surface the suburbs where older residents are most exposed. Useful for residents and their families, community groups, and council heat-outreach planning.',
+    body: 'Use it to spot suburbs where older residents may need more attention on hot days. It can help families, community groups, and councils plan ahead — but it does not replace personal health or cooling advice.',
   },
 ];
 
@@ -551,8 +552,9 @@ onBeforeUnmount(() => {
           <div class="map-section__description">
             <img src="/awareness-map-overview.png" alt="" aria-hidden="true" />
             <p>
-              Where hot places overlap with older residents who may benefit from extra
-              support — turning a city-wide heat warning into a local picture you can act on.
+              This map shows which Greater Melbourne suburbs may be harder for older
+              residents on hot days — so a city-wide heat warning becomes a local
+              picture you can act on.
             </p>
           </div>
         </div>
@@ -598,7 +600,7 @@ onBeforeUnmount(() => {
         />
       </section>
 
-      <!-- ─── Bottom: Patterns across GMEL — top suburbs + key finding chart ─── -->
+      <!-- Bottom: patterns across Greater Melbourne - top suburbs and key finding chart -->
       <!-- Always rendered (not gated by Learn More) — shows loading state until map data loads -->
       <section class="patterns-section">
         <BrandWatermark />
@@ -606,10 +608,11 @@ onBeforeUnmount(() => {
 
         <div class="patterns-section__intro" data-rise="section-head">
           <SectionKicker>Patterns across Greater Melbourne</SectionKicker>
-          <h2>Across the <span class="awareness-script awareness-script--inline">city</span></h2>
+          <h2>Across <span class="awareness-script awareness-script--inline">Greater Melbourne</span></h2>
           <p>
-            Two readings of the same dataset — which suburbs sit at the extremes today,
-            and where the older population is concentrated across the five bands.
+            Two views of the same data: which suburbs are the most and least
+            heat-sensitive for older residents, and where residents aged 65+ live
+            across all five score levels.
           </p>
         </div>
 
@@ -641,7 +644,7 @@ onBeforeUnmount(() => {
 
             <label class="patterns-card__filter">
               <input type="checkbox" v-model="includeLowConfidence" />
-              <span>Include small suburbs (1–2 statistical areas)</span>
+              <span>Include small suburbs (less certain scores)</span>
             </label>
 
             <ol v-if="suburbFeatures.length" class="ranking-list" aria-label="Suburb ranking">
@@ -670,7 +673,7 @@ onBeforeUnmount(() => {
                       }"
                     />
                   </span>
-                  <span class="ranking-row__value" :title="`SHVI raw: ${feature.properties.shvi_raw?.toFixed(3)}`">
+                  <span class="ranking-row__value" :title="`${feature.properties.suburb_name}: heat-sensitivity score ${feature.properties.shvi_score} of 5`">
                     {{ feature.properties.shvi_score }}
                     <small>/5</small>
                   </span>
@@ -691,19 +694,19 @@ onBeforeUnmount(() => {
             <header class="patterns-card__head">
               <div>
                 <h3>Where older residents live</h3>
-                <p>Count of residents aged 65+ in each SHVI band — by far the biggest social-equity finding in this dataset.</p>
+                <p>How many residents aged 65+ live at each score level — showing where support on hot days could reach the most older people.</p>
               </div>
             </header>
 
-            <div v-if="suburbFeatures.length" class="seniors-chart" aria-label="Older population distribution across SHVI bands">
+            <div v-if="suburbFeatures.length" class="seniors-chart" aria-label="Older residents at each heat-sensitivity score">
               <div
                 v-for="row in seniorsByBand"
                 :key="row.band"
                 class="seniors-chart__row"
-                :title="`Band ${row.band}: ${row.suburbs} suburbs, ${row.count.toLocaleString()} residents aged 65+`"
+                :title="`Score ${row.band}: ${row.suburbs} suburbs, ${row.count.toLocaleString()} residents aged 65+`"
               >
                 <span class="seniors-chart__label">
-                  Band {{ row.band }}
+                  Score {{ row.band }}
                 </span>
                 <span class="seniors-chart__bar">
                   <i
@@ -726,11 +729,13 @@ onBeforeUnmount(() => {
 
             <div v-if="suburbFeatures.length" class="patterns-card__finding">
               <strong>{{ totalSeniorsHigher }}%</strong>
-              <span>of Greater Melbourne residents aged 65+ live in heat-sensitive suburbs (bands 4 &amp; 5).</span>
+              <span>of Greater Melbourne residents aged 65+ live in the most heat-sensitive suburbs (scored 4 or 5).</span>
             </div>
 
             <p class="patterns-card__caveat">
-              SEIFA-IRSD (socio-economic disadvantage) is the strongest single driver of the score — about three times stronger than satellite heat metrics. Where older people live who already face fewer resources is exactly where heat planning matters most.
+              A suburb's score reflects more than temperature. Where older residents
+              have fewer local resources and services nearby, the score can be higher
+              even when the area is not the hottest.
             </p>
           </article>
         </div>
@@ -744,12 +749,12 @@ onBeforeUnmount(() => {
           <SectionKicker>Concern levels</SectionKicker>
           <h2>
             Reading
-            <span class="awareness-script">the bands.</span>
+            <span class="awareness-script">the scores.</span>
           </h2>
           <p>
-            Bands run from 1 to 5 and rank Greater Melbourne suburbs by how much extra
-            community attention older residents may benefit from on hot days. Tap a band
-            to see what life on a heat day typically looks like there.
+            Scores run from 1 to 5 across Greater Melbourne suburbs. A higher score
+            points to places where older residents may benefit from more planning and
+            check-ins on hot days. Tap a score to see what a hot day may look like there.
           </p>
         </div>
 
@@ -822,20 +827,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <footer class="awareness-footer">
-        <div class="awareness-footer__inner">
-          <p class="awareness-footer__safety">
-            <strong>Safety:</strong> This map is for awareness and planning only. It does not predict
-            individual health outcomes or replace official heat-health advice. If you feel dizzy,
-            confused, weak, very thirsty, or unwell during hot weather, seek medical help. In an
-            emergency, call <strong>000</strong>.
-          </p>
-          <p>
-            <strong>Data source:</strong> DELWP Urban Heat Islands and Heat Vulnerability Assessment
-            in Melbourne, 2018.
-          </p>
-        </div>
-      </footer>
+      <AppFooter />
     </main>
   </div>
 </template>
@@ -846,39 +838,7 @@ onBeforeUnmount(() => {
   background: var(--brand-paper-white);
 }
 
-.awareness-footer {
-  background: var(--brand-ink-soft);
-  color: var(--brand-paper);
-  padding: clamp(40px, 6vw, 72px) 0;
-}
-
-.awareness-footer__inner {
-  width: min(100% - var(--gutter) * 2, 1180px);
-  margin-inline: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.awareness-footer p {
-  max-width: 88ch;
-  color: rgba(248, 241, 227, 0.85);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.6;
-}
-
-.awareness-footer strong {
-  color: var(--brand-paper-white);
-  font-weight: 900;
-}
-
-.awareness-footer__safety {
-  padding: 18px 22px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(248, 241, 227, 0.18);
-}
+/* Footer styles now live in the shared AppFooter.vue component. */
 
 .map-section,
 .patterns-section,

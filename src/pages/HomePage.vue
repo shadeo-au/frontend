@@ -6,6 +6,7 @@ import HeroBlendSection from '../components/HeroBlendSection.vue';
 import PageSection from '../components/PageSection.vue';
 import SectionKicker from '../components/SectionKicker.vue';
 import VisualPanel from '../components/VisualPanel.vue';
+import AppFooter from '../components/AppFooter.vue';
 import { gsap, prefersReducedMotion, ScrollTrigger } from '../lib/gsap';
 
 const root = ref<HTMLElement | null>(null);
@@ -228,20 +229,7 @@ onBeforeUnmount(() => {
         </template>
       </PageSection>
 
-      <footer class="home-footer">
-        <div class="home-footer__inner">
-          <p class="home-footer__safety">
-            <strong>Safety:</strong> Shadeo supports planning and awareness only. It does not replace
-            medical advice. If you feel dizzy, confused, weak, very thirsty, or unwell during hot
-            weather, seek medical help. In an emergency, call <strong>000</strong>.
-          </p>
-          <p>
-            <strong>Data sources:</strong> Shadeo uses publicly available heat-health guidance,
-            Melbourne open data, and local map layers for shade, rest facilities, and community
-            services where available.
-          </p>
-        </div>
-      </footer>
+      <AppFooter />
     </main>
   </div>
 </template>
@@ -255,39 +243,7 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, var(--brand-paper-white) 0%, var(--brand-paper) 100%);
 }
 
-.home-footer {
-  background: var(--brand-ink-soft);
-  color: var(--brand-paper);
-  padding: clamp(40px, 6vw, 72px) 0;
-}
-
-.home-footer__inner {
-  width: min(100% - var(--gutter) * 2, 1180px);
-  margin-inline: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.home-footer p {
-  max-width: 88ch;
-  color: rgba(248, 241, 227, 0.85);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.6;
-}
-
-.home-footer strong {
-  color: var(--brand-paper-white);
-  font-weight: 900;
-}
-
-.home-footer__safety {
-  padding: 18px 22px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(248, 241, 227, 0.18);
-}
+/* Footer styles now live in the shared AppFooter.vue component. */
 
 .hero-cue {
   width: fit-content;

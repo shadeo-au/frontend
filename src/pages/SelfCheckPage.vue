@@ -3,6 +3,7 @@ import { computed, nextTick, reactive, ref } from 'vue';
 import AppNav from '@/components/AppNav.vue';
 import AppButton from '@/components/AppButton.vue';
 import SectionKicker from '@/components/SectionKicker.vue';
+import AppFooter from '@/components/AppFooter.vue';
 import Wizard from '@/components/selfcheck/Wizard.vue';
 import ResultDashboard from '@/components/selfcheck/ResultDashboard.vue';
 
@@ -126,19 +127,12 @@ function scrollToWizard() {
       </section>
 
       <!-- Footer -->
-      <footer class="sc-footer">
-        <div class="sc-section__inner">
-          <p class="sc-footer__safety">
-            <strong>Safety:</strong> This tool does not replace medical advice. If you feel dizzy,
-            confused, weak, very thirsty, or unwell during hot weather, seek medical help. In an
-            emergency, call <strong>000</strong>.
-          </p>
-          <p class="sc-footer__privacy">
-            Your answers stay on this device only and are cleared when you close this page.
-            You do not need to create an account.
-          </p>
-        </div>
-      </footer>
+      <AppFooter>
+        <p>
+          <strong>Your privacy:</strong> Your answers stay on this device only and are
+          cleared when you close this page. You do not need to create an account.
+        </p>
+      </AppFooter>
     </main>
   </div>
 </template>
@@ -330,31 +324,7 @@ function scrollToWizard() {
 }
 .sc-head--center p { margin-inline: auto; }
 
-.sc-footer {
-  background: var(--brand-ink-soft);
-  color: var(--brand-paper);
-  padding: clamp(40px, 6vw, 72px) 0;
-}
-.sc-footer .sc-section__inner {
-  gap: 14px;
-}
-.sc-footer p {
-  color: rgba(248, 241, 227, 0.85);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.6;
-  max-width: 88ch;
-}
-.sc-footer strong {
-  color: var(--brand-paper-white);
-  font-weight: 900;
-}
-.sc-footer__safety {
-  padding: 18px 22px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(248, 241, 227, 0.18);
-}
+/* Footer styles now live in the shared AppFooter.vue component. */
 @media (max-width: 780px) {
   .sc-hero {
     min-height: 720px;

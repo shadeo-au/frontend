@@ -5,6 +5,7 @@ import AppButton from '../components/AppButton.vue';
 import HeroFullSection from '../components/HeroFullSection.vue';
 import SectionKicker from '../components/SectionKicker.vue';
 import BrandWatermark from '../components/BrandWatermark.vue';
+import AppFooter from '../components/AppFooter.vue';
 import { gsap, prefersReducedMotion, ScrollTrigger } from '../lib/gsap';
 
 const root = ref<HTMLElement | null>(null);
@@ -328,25 +329,16 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <footer class="why-footer">
-        <div class="why-footer__inner">
-          <p class="why-footer__safety">
-            <strong>Safety:</strong> Shadeo explains heat risk patterns and planning options. It does
-            not replace medical advice. If you feel dizzy, confused, weak, very thirsty, or unwell
-            during hot weather, seek medical help. In an emergency, call <strong>000</strong>.
-          </p>
-          <div class="why-footer__sources">
-            <strong>Data sources:</strong>
-            <ul>
-              <li>AIHW (2023). Let's talk about the weather: injuries related to extreme weather. aihw.gov.au</li>
-              <li>AIHW (2024). Australia's Health 2024: Extreme weather related injuries. aihw.gov.au</li>
-              <li>Department of Health, Victoria (2024). Research and reports - extreme heat and heatwaves. health.vic.gov.au</li>
-              <li>Department of Health, Victoria (2026). Increased heat-related health risks - Health Advisory #260127. health.vic.gov.au</li>
-              <li>eSafety Commissioner (2018). Digital behaviours of older Australians: digital confidence. esafety.gov.au</li>
-            </ul>
-          </div>
-        </div>
-      </footer>
+      <AppFooter>
+        <p><strong>References</strong></p>
+        <ul>
+          <li>AIHW (2023). Let's talk about the weather: injuries related to extreme weather. aihw.gov.au</li>
+          <li>AIHW (2024). Australia's Health 2024: Extreme weather related injuries. aihw.gov.au</li>
+          <li>Department of Health, Victoria (2024). Research and reports — extreme heat and heatwaves. health.vic.gov.au</li>
+          <li>Department of Health, Victoria (2026). Increased heat-related health risks — Health Advisory #260127. health.vic.gov.au</li>
+          <li>eSafety Commissioner (2018). Digital behaviours of older Australians: digital confidence. esafety.gov.au</li>
+        </ul>
+      </AppFooter>
 
 
     </main>
@@ -361,49 +353,7 @@ onBeforeUnmount(() => {
   background: var(--brand-paper-white);
 }
 
-.why-footer {
-  background: var(--brand-ink-soft);
-  color: var(--brand-paper);
-  padding: clamp(40px, 6vw, 72px) 0;
-}
-
-.why-footer__inner {
-  width: min(100% - var(--gutter) * 2, 1180px);
-  margin-inline: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.why-footer p,
-.why-footer__sources {
-  max-width: 96ch;
-  color: rgba(248, 241, 227, 0.85);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.6;
-}
-
-.why-footer strong {
-  color: var(--brand-paper-white);
-  font-weight: 900;
-}
-
-.why-footer__safety {
-  padding: 18px 22px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(248, 241, 227, 0.18);
-}
-
-.why-footer__sources ul {
-  margin: 10px 0 0;
-  padding-left: 1.15rem;
-}
-
-.why-footer__sources li + li {
-  margin-top: 4px;
-}
+/* Footer styles now live in the shared AppFooter.vue component. */
 
 
 .why-hero {

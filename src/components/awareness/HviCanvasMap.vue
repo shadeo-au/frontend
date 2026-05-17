@@ -535,7 +535,7 @@ const setupMap = async () => {
             const bandLabel = feature.properties.shvi_band_label
               ?? concernLabels[metricValue(feature)];
             const suffix = feature.properties.low_confidence
-              ? ' (small area — lower confidence)'
+              ? ' (small suburb — score less certain)'
               : '';
             status.value = `${feature.properties.suburb_name}: ${bandLabel}${suffix}.`;
           },
@@ -559,7 +559,7 @@ const setupMap = async () => {
     map.on('zoomend', updateLabelBand);
 
     const scored = data.features.filter((f) => f.properties.shvi_score !== null).length;
-    status.value = `${scored.toLocaleString()} of ${data.features.length.toLocaleString()} suburbs scored on the Senior Heat Vulnerability Index (Greater Melbourne, 2021).`;
+    status.value = `${scored.toLocaleString()} of ${data.features.length.toLocaleString()} Greater Melbourne suburbs scored for senior heat sensitivity (2021).`;
     emit('dataLoaded', data.features);
     await nextTick();
     map.invalidateSize();
@@ -658,8 +658,8 @@ onBeforeUnmount(() => {
         <!-- Floating band legend — always visible so users have context
              before selecting a suburb. Bottom-left avoids the zoom controls
              on the bottom-right. -->
-        <div class="hvi-map__legend-overlay" aria-label="Score band legend">
-          <div class="hvi-map__legend-overlay__title">Band</div>
+        <div class="hvi-map__legend-overlay" aria-label="Score legend">
+          <div class="hvi-map__legend-overlay__title">Score</div>
           <div v-for="level in [1, 2, 3, 4, 5]" :key="level" class="hvi-map__legend-overlay__row">
             <i :style="{ background: concernColors[level] }" aria-hidden="true" />
             <span><b>{{ level }}</b> {{ concernLabels[level] }}</span>
@@ -668,7 +668,7 @@ onBeforeUnmount(() => {
             <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
               <rect x="2" y="2" width="14" height="14" rx="5" />
             </svg>
-            <span>Dashed = wider uncertainty</span>
+            <span>Dashed = less certain</span>
           </div>
         </div>
       </div>
@@ -685,14 +685,14 @@ onBeforeUnmount(() => {
             <strong>{{ selectedLevel }}</strong>
             <span class="hvi-map__shvi-label">
               For older residents
-              <InfoTip label="How this ranking is built">
-                Ranks Greater Melbourne suburbs by how much extra community attention residents aged 65+ may need on hot days.
+              <InfoTip label="What this score means">
+                This score compares Greater Melbourne suburbs by how hard hot days may be for residents aged 65+. A higher score means more support may help. It is not an absolute danger rating.
               </InfoTip>
             </span>
           </div>
         </div>
 
-        <div class="hvi-map__score-dots" aria-label="SHVI score out of five">
+        <div class="hvi-map__score-dots" aria-label="Heat-sensitivity score out of five">
           <i
             v-for="level in [1, 2, 3, 4, 5]"
             :key="level"
@@ -706,11 +706,11 @@ onBeforeUnmount(() => {
           class="hvi-map__notice"
           role="note"
           tabindex="0"
-          title="This suburb covers only 1-2 small statistical areas, so its score has wider uncertainty than larger suburbs."
-          data-tooltip="This suburb covers only 1-2 small statistical areas, so its score has wider uncertainty than larger suburbs."
+          title="This is a small suburb with limited data, so its score is less certain than for larger suburbs."
+          data-tooltip="This is a small suburb with limited data, so its score is less certain than for larger suburbs."
         >
           <i aria-hidden="true">!</i>
-          <span>This suburb covers only 1–2 small statistical areas, so its score has wider uncertainty than larger suburbs.</span>
+          <span>This is a small suburb with limited data, so its score is less certain than for larger suburbs.</span>
         </div>
 
         <!-- Layer 1: simple breakdown — "Why this score?" -->
@@ -718,7 +718,7 @@ onBeforeUnmount(() => {
           <h4>
             Why this score?
             <InfoTip label="How to read this breakdown">
-              Three factors push the score up. Longer bar = stronger push for this suburb compared with the rest of Greater Melbourne.
+              Each bar shows one thing that affects this suburb's score. A longer bar means that factor pushes the score higher.
             </InfoTip>
           </h4>
 
@@ -727,7 +727,7 @@ onBeforeUnmount(() => {
               <span>
                 Heat in the area
                 <InfoTip label="What is heat in the area?">
-                  Surface temperature, tree cover, and how built-up the streets are.
+                  How hot the area tends to get — based on surface temperature, how little greenery there is, and how built-up it is, compared with the rest of Greater Melbourne.
                 </InfoTip>
               </span>
               <strong>{{ exposureBandLabel }}</strong>
@@ -745,7 +745,7 @@ onBeforeUnmount(() => {
               <span>
                 Older residents at risk
                 <InfoTip label="What does older residents at risk mean?">
-                  Share of residents aged 65+, those living alone, and those needing care.
+                  How many residents are aged 65+, live alone, or need help with daily activities — the people most affected by heat.
                 </InfoTip>
               </span>
               <strong>{{ seniorSensBandLabel }}</strong>
@@ -763,7 +763,7 @@ onBeforeUnmount(() => {
               <span>
                 Lack of local support
                 <InfoTip label="What is lack of local support?">
-                  Local socio-economic resources — affects access to cooling, services, and support.
+                  How limited local resources and services are. Suburbs with fewer local resources show a larger support gap.
                 </InfoTip>
               </span>
               <strong>{{ resourceGapBandLabel }}</strong>
@@ -836,18 +836,18 @@ onBeforeUnmount(() => {
 
             <section class="hvi-modal__body">
               <div class="hvi-modal__row">
-                <span>Final score</span>
+                <span>SHVI band</span>
                 <strong>{{ selectedScore }} of 5 — {{ selectedLevel }}</strong>
               </div>
               <div class="hvi-modal__row">
                 <span>Raw SHVI value</span>
                 <strong>{{ shviRaw != null ? shviRaw.toFixed(3) : '—' }}</strong>
-                <small>A continuous score before being binned into 1–5. Useful for fine comparison.</small>
+                <small>The continuous SHVI value before suburb bands are assigned. It can be negative because adaptive capacity is subtracted; use it for fine comparison between suburbs.</small>
               </div>
               <div v-if="stabilityPct != null" class="hvi-modal__row">
                 <span>Score robustness</span>
                 <strong>{{ stabilityPct }}%</strong>
-                <small>How often this suburb keeps the same band when we re-run the formula with each factor weight shifted by ±20%. Higher = the priority for this suburb does not depend on our exact weight choices.</small>
+                <small>The share of +/-20% weight-change scenarios where this suburb stays in the same 1-to-5 band. Higher means the band is less sensitive to exact weight choices.</small>
               </div>
               <div v-if="isLowConfidence" class="hvi-modal__row hvi-modal__row--warn">
                 <span>Sample-size note</span>
@@ -859,18 +859,24 @@ onBeforeUnmount(() => {
 
               <h4>How the score is built</h4>
               <p>
-                SHVI is computed at the statistical-area level (SA1, roughly 150–300 residents each), then averaged up to suburbs, weighted by how many residents aged 65+ live in each SA1.
+                SHVI stands for Senior Heat Vulnerability Index. It estimates relative heat vulnerability for older residents in Greater Melbourne; it is not a forecast or an official government rating.
               </p>
-              <p>Three factors combine into the final number:</p>
-              <code class="hvi-modal__formula">SHVI = (Heat in area + Older residents at risk + Lack of local support) / 3</code>
               <p>
-                Each input is ranked against all Greater Melbourne suburbs, so a 5 means "among the most senior-vulnerable 20% of GMEL" — a relative position within the city, not an absolute danger threshold.
+                We compute SHVI first for SA1 statistical areas, then aggregate to suburbs using the number of residents aged 65+ in each SA1 and the SA1-to-suburb overlap.
+              </p>
+              <p>Three sub-indexes are combined into the raw value:</p>
+              <code class="hvi-modal__formula">Exposure = 0.50 surface heat + 0.25 vegetation deficit + 0.25 built density
+Senior sensitivity = 0.40 age 65+ + 0.30 need for assistance + 0.20 lone-living 65+ + 0.10 population density
+Adaptive capacity = (SEIFA IRSD + SEIFA IEO) / 2
+SHVI raw = (Exposure + Senior sensitivity - Adaptive capacity) / 3</code>
+              <p>
+                Inputs are normalized within Greater Melbourne before combining. After suburb aggregation, scored suburbs are split into five relative bands, so band 5 means the highest SHVI quintile among scored Greater Melbourne suburbs, not an absolute danger threshold.
               </p>
 
               <h4>Why this approach</h4>
               <ul>
                 <li>Method based on the Heat Vulnerability Index by Loughnan et al. (RMIT, 2013/2014).</li>
-                <li>We adapted it to focus on residents aged 65+ — removed the 0–4 age input, added the share of older residents living alone (the strongest predictor of heat-related risk for older adults in past heat-wave studies), and aggregated to suburbs by 65+ population weight.</li>
+                <li>We adapted the framework for residents aged 65+ by removing the early-childhood input, adding lone-living older residents, and weighting suburb aggregation toward where older residents live.</li>
               </ul>
 
               <p class="hvi-modal__attribution">
@@ -1809,6 +1815,7 @@ onBeforeUnmount(() => {
   font-family: var(--font-mono, ui-monospace, SF Mono, Menlo, Consolas, monospace);
   font-size: 0.9rem;
   font-weight: 700;
+  white-space: pre-wrap;
   word-break: break-word;
 }
 
