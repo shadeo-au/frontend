@@ -1,6 +1,3 @@
-export const DEFAULT_WEATHER_SUITABILITY_ENDPOINT =
-  'https://d22z6whz3d.execute-api.ap-southeast-2.amazonaws.com/api/weather-suitability'
-
 const VALID_TRIP_DATES = new Set(['today', 'tomorrow'])
 
 export const normaliseTripDate = (value) => {
@@ -10,7 +7,7 @@ export const normaliseTripDate = (value) => {
 
 export const weatherSuitabilityEndpoint = (env = {}) => {
   const endpoint = String(env.VITE_WEATHER_SUITABILITY_ENDPOINT || '').trim()
-  return endpoint || DEFAULT_WEATHER_SUITABILITY_ENDPOINT
+  return endpoint
 }
 
 export const buildWeatherRequest = (tripDate, place) => {

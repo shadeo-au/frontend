@@ -1519,6 +1519,11 @@ const setTripDate = (value) => {
 const loadWeatherForStart = async () => {
   const place = selectedStart.value
   if (!place?.lat || !place?.lng) return
+  if (!weatherSuitabilityApiEndpoint) {
+    weather.suitability = null
+    weather.error = 'Weather advice is not configured right now.'
+    return
+  }
   const weatherRequest = buildWeatherRequest(tripDate.value, place)
   const requestKey = weatherRequest.key
   if (weatherRequestKey === requestKey && (weather.suitability || weather.isLoading)) return
