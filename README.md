@@ -130,6 +130,46 @@ change.
 
 ---
 
+## Walk Planner weather suitability API
+
+The Walk Planner readiness check calls the Shadeo AI weather suitability API.
+Users can choose whether the walk is for today or tomorrow before opening the
+route map.
+
+Configure the endpoint in `.env.local`:
+
+```bash
+VITE_WEATHER_SUITABILITY_ENDPOINT=https://d22z6whz3d.execute-api.ap-southeast-2.amazonaws.com/api/weather-suitability
+VITE_DEFAULT_TRIP_DATE=today
+```
+
+Request body:
+
+```json
+{
+  "tripDate": "today",
+  "startingPoint": {
+    "lat": -37.8136,
+    "lng": 144.9631,
+    "label": "Melbourne CBD"
+  }
+}
+```
+
+The UI renders only the user-facing response fields: `date`, `label`,
+`uiLabel`, `summary`, and `mainFactors`. If the API is unavailable, route
+planning still works and the readiness check shows a gentle unavailable state.
+The selected `tripDate` is passed through to the API unchanged: `today` uses the
+same-day rule path, while `tomorrow` uses the Exp3 next-day model path. The
+current deployed model API uses Melbourne weather data as its weather source;
+the `startingPoint` keeps the frontend/API contract stable for trip context.
+
+The `summary` text comes from the API label mapping. The more specific weather
+drivers are shown through `mainFactors`, which the UI presents as user-facing
+weather factor cards.
+
+---
+
 ## Data sources (planned production)
 
 | Layer | Source | License |
