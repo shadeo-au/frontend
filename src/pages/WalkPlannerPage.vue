@@ -52,6 +52,7 @@
               <small>Type a street address or landmark as your starting point.</small>
             </span>
           </button>
+
         </div>
 
         <form v-if="startMode === 'manual'" class="planner-search-box" @submit.prevent="runStartSearch">
@@ -430,13 +431,26 @@
         <div class="planner-readiness-block planner-weather-card">
           <div class="planner-weather-brief-head">
             <div>
-              <h3>Weather before you leave</h3>
-              <p>Intelligent pre-departure briefing for your journey.</p>
+              <h3>{{ weatherTripHeading }}</h3>
+              <p>{{ weatherTripDescription }}</p>
             </div>
             <span class="planner-weather-ai-badge">
               <Icon icon="material-symbols:verified-rounded" aria-hidden="true" />
-              AI verified
+              Pre-trip guidance
             </span>
+          </div>
+
+          <div class="planner-weather-trip-switch" role="group" aria-label="Choose trip timing">
+            <button
+              v-for="option in weatherTripOptions"
+              :key="option.value"
+              type="button"
+              :class="{ active: tripDate === option.value }"
+              @click="setTripDate(option.value)"
+            >
+              <span>{{ option.label }}</span>
+              <small>{{ option.description }}</small>
+            </button>
           </div>
 
           <div v-if="weather.isLoading" class="planner-weather-loading" aria-label="Loading weather guidance">
@@ -478,9 +492,11 @@
               >
                 <div class="planner-weather-factor-top">
                   <Icon :icon="card.icon" aria-hidden="true" />
-                  <span>{{ card.label }}</span>
                 </div>
-                <strong>{{ card.title }}</strong>
+                <strong>
+                  <span class="planner-weather-factor-label">{{ card.label }}</span>
+                  {{ card.title }}
+                </strong>
               </article>
             </div>
           </template>
@@ -675,6 +691,13 @@ import timeIcon from '../assets/svg/time-icon.svg'
 import benchIcon from '../assets/svg/bench-icon.svg'
 import toiletIcon from '../assets/svg/toilet-icon.svg'
 import fountainIcon from '../assets/svg/drinking-fountain-icon.svg'
+import {
+  buildWeatherFactorCard,
+  buildWeatherRequest,
+  formatTripDateLabel,
+  normaliseTripDate,
+  weatherSuitabilityEndpoint,
+} from '../lib/weather-suitability.js'
 
 const DEFAULT_MAP_CENTER = { lat: -37.8136, lng: 144.9631 }
 const MAP_VIEW_BOUNDS = [[-37.895, 144.875], [-37.735, 145.055]]
@@ -818,7 +841,7 @@ const maxReachableStep = ref(1)
 
 const readiness = reactive({ tripItems: [], essentials: [] })
 const weather = reactive({ isLoading: false, error: '', suitability: null })
-const tripDate = ref('today')
+const tripDate = ref(normaliseTripDate(import.meta.env.VITE_DEFAULT_TRIP_DATE))
 const shoppingInput = ref('')
 const shoppingItems = ref([])
 const result = reactive({
@@ -1035,6 +1058,18 @@ const scoreBreakdownRows = computed(() => [
 const destinationChecklist = computed(() => destinationChecklistByType[destinationKind.value] || destinationChecklistByType.default)
 const destinationChecklistIntro = computed(() => destinationChecklist.value.intro)
 const destinationChecklistItems = computed(() => destinationChecklist.value.items)
+const weatherTripOptions = [
+  { value: 'today', label: 'Today', description: 'Before you leave' },
+  { value: 'tomorrow', label: 'Tomorrow', description: 'Plan ahead' },
+]
+const weatherTripHeading = computed(() => (
+  tripDate.value === 'tomorrow' ? 'Weather for tomorrow' : 'Weather before you leave'
+))
+const weatherTripDescription = computed(() => (
+  tripDate.value === 'tomorrow'
+    ? 'AI weather guidance for planning this walk tomorrow.'
+    : 'AI weather guidance for this walk today.'
+))
 const weatherSuitabilityTone = (label) => {
   if (label === 'Not Recommended') return 'danger'
   if (label === 'Caution') return 'caution'
@@ -1075,34 +1110,11 @@ const weatherAdvice = computed(() => {
 })
 const weatherUpdatedText = computed(() => {
   const date = weather.suitability?.date
-  if (!date) return weather.isLoading ? 'Updating now.' : 'Based on current trip details.'
-  const parsed = new Date(`${date}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return 'Based on current trip details.'
-  const formatted = new Intl.DateTimeFormat('en-AU', { month: 'short', day: 'numeric' }).format(parsed)
-  return `Forecast guidance for ${formatted}.`
+  if (!date) return weather.isLoading ? 'Updating now.' : formatTripDateLabel(tripDate.value)
+  return formatTripDateLabel(tripDate.value, date)
 })
 const weatherFactorCards = computed(() => {
-  return weatherAdvice.value.items.map((factor, index) => {
-    const text = String(factor || '').trim()
-    const lower = text.toLowerCase()
-    let icon = 'material-symbols:info-outline-rounded'
-
-    if (/(temp|heat|warm|hot|cool|cold)/.test(lower)) {
-      icon = 'material-symbols:device-thermostat'
-    } else if (/(rain|rainfall|precip|wet|storm|drizzle)/.test(lower)) {
-      icon = 'material-symbols:water-drop'
-    } else if (/wind/.test(lower)) {
-      icon = 'material-symbols:air-rounded'
-    }
-
-    return {
-      key: `factor-${index}-${text}`,
-      label: `Factor ${index + 1}`,
-      icon,
-      title: text,
-      tone: 'normal'
-    }
-  })
+  return weatherAdvice.value.items.map((factor, index) => buildWeatherFactorCard(factor, index))
 })
 const readinessRouteAlerts = computed(() => [
   'This route may include comfort markers for benches, toilets, and drinking fountains.',
@@ -1493,27 +1505,36 @@ const searchPlaces = async (query) => {
   }
 }
 let weatherRequestKey = ''
-const weatherSuitabilityEndpoint = 'https://d22z6whz3d.execute-api.ap-southeast-2.amazonaws.com/api/weather-suitability'
+const weatherSuitabilityApiEndpoint = weatherSuitabilityEndpoint(import.meta.env)
+const setTripDate = (value) => {
+  const nextTripDate = normaliseTripDate(value)
+  if (tripDate.value === nextTripDate) return
+  tripDate.value = nextTripDate
+  weather.suitability = null
+  weather.error = ''
+  if (isReadinessOpen.value) {
+    loadWeatherForStart()
+  }
+}
 const loadWeatherForStart = async () => {
   const place = selectedStart.value
   if (!place?.lat || !place?.lng) return
-  const requestKey = `${tripDate.value}:${place.lat},${place.lng}`
+  if (!weatherSuitabilityApiEndpoint) {
+    weather.suitability = null
+    weather.error = 'Weather advice is not configured right now.'
+    return
+  }
+  const weatherRequest = buildWeatherRequest(tripDate.value, place)
+  const requestKey = weatherRequest.key
   if (weatherRequestKey === requestKey && (weather.suitability || weather.isLoading)) return
   weatherRequestKey = requestKey
   weather.isLoading = true
   weather.error = ''
   try {
-    const response = await fetch(weatherSuitabilityEndpoint, {
+    const response = await fetch(weatherSuitabilityApiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tripDate: tripDate.value,
-        startingPoint: {
-          lat: Number(place.lat),
-          lng: Number(place.lng),
-          label: place.name || place.address || 'Selected starting point'
-        }
-      })
+      body: JSON.stringify(weatherRequest.body)
     })
     const payload = await readJsonResponse(response)
     if (!response.ok) throw new Error('Weather advice is not available right now.')
@@ -4145,6 +4166,50 @@ onBeforeUnmount(() => {
   height: 15px;
 }
 
+.planner-weather-trip-switch {
+  margin-top: 18px;
+  padding: 5px;
+  border: 1px solid rgba(35, 45, 39, 0.08);
+  border-radius: 14px;
+  background: rgba(238, 243, 239, 0.9);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.planner-weather-trip-switch button {
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--brand-ink-muted);
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planner-weather-trip-switch button.active {
+  background: #ffffff;
+  color: var(--brand-ink-soft);
+  box-shadow: 0 8px 22px rgba(35, 45, 39, 0.08);
+}
+
+.planner-weather-trip-switch span {
+  font-size: 0.95rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.planner-weather-trip-switch small {
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
 .planner-weather-summary-card {
   margin-top: 22px;
   padding: 20px;
@@ -4284,72 +4349,103 @@ onBeforeUnmount(() => {
 }
 
 .planner-weather-factor-grid {
-  margin-top: 20px;
+  margin-top: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .planner-weather-factor-card {
-  margin-top: 20px;
-  min-height: 138px;
-  padding: 20px;
-  border: 1px solid rgba(35, 45, 39, 0.04);
-  border-radius: 10px;
-  background: #f4f5f6;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid rgba(35, 45, 39, 0.06);
+  border-radius: 12px;
+  background: #fbfbf7;
   display: grid;
-  align-content: space-between;
-  gap: 14px;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 12px;
+  box-shadow: 0 10px 26px rgba(35, 45, 39, 0.045);
 }
 
-.planner-weather-factor-card.caution {
-  border-color: rgba(239, 166, 43, 0.18);
+.planner-weather-factor-card.rain {
+  border-color: rgba(87, 132, 142, 0.2);
+  background: #f3faf9;
+}
+
+.planner-weather-factor-card.humidity {
+  border-color: rgba(97, 132, 113, 0.18);
+  background: #f5faf2;
+}
+
+.planner-weather-factor-card.temperature {
+  border-color: rgba(239, 166, 43, 0.2);
   background: #fffaf0;
 }
 
-.planner-weather-factor-card.danger {
-  border-color: rgba(194, 82, 68, 0.18);
-  background: #fff6f4;
+.planner-weather-factor-card.wind {
+  border-color: rgba(126, 145, 153, 0.2);
+  background: #f6f8f8;
 }
 
 .planner-weather-factor-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(35, 45, 39, 0.04);
 }
 
 .planner-weather-factor-top svg {
-  width: 22px;
-  height: 22px;
+  width: 21px;
+  height: 21px;
   color: #6a7774;
 }
 
-.planner-weather-factor-card.blue .planner-weather-factor-top svg {
-  color: #1c80e8;
+.planner-weather-factor-card.rain .planner-weather-factor-top svg {
+  color: #4f7982;
 }
 
-.planner-weather-factor-card.caution .planner-weather-factor-top svg {
+.planner-weather-factor-card.humidity .planner-weather-factor-top svg {
+  color: #5f816b;
+}
+
+.planner-weather-factor-card.temperature .planner-weather-factor-top svg {
   color: #9a6a12;
 }
 
-.planner-weather-factor-card.danger .planner-weather-factor-top svg {
-  color: #9a3b30;
+.planner-weather-factor-card.wind .planner-weather-factor-top svg {
+  color: #6c7f89;
 }
 
 .planner-weather-factor-top span {
-  color: #68716e;
-  font-size: 0.66rem;
-  font-weight: 950;
-  line-height: 1;
-  text-transform: uppercase;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 .planner-weather-factor-card strong {
   color: var(--brand-ink-soft);
-  font-size: 1rem;
+  display: grid;
+  gap: 6px;
+  font-size: 0.98rem;
   font-weight: 950;
-  line-height: 1.2;
+  line-height: 1.28;
+}
+
+.planner-weather-factor-card .planner-weather-factor-label {
+  color: #68756f;
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .planner-weather-factor-skeleton {
