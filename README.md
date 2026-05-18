@@ -139,7 +139,7 @@ route map.
 Configure the endpoint in `.env.local`:
 
 ```bash
-VITE_WEATHER_SUITABILITY_ENDPOINT=https://d22z6whz3d.execute-api.ap-southeast-2.amazonaws.com/api/weather-suitability
+VITE_WEATHER_SUITABILITY_ENDPOINT=https://example.com/api/weather-suitability
 VITE_DEFAULT_TRIP_DATE=today
 ```
 

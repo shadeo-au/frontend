@@ -32,23 +32,13 @@ export const buildWeatherRequest = (tripDate, place) => {
   }
 }
 
-export const shouldShowDemoStart = (env = {}) => env.VITE_ENABLE_DEMO_START === 'true'
-
-export const demoStartPlace = () => ({
-  id: 'demo-melbourne-cbd',
-  name: 'Melbourne CBD',
-  address: 'Melbourne CBD, VIC',
-  lat: -37.8136,
-  lng: 144.9631,
-})
-
 export const formatTripDateLabel = (tripDate, date, locale = 'en-AU') => {
   const resolvedTripDate = normaliseTripDate(tripDate)
   const prefix = resolvedTripDate === 'tomorrow' ? 'Planning for tomorrow' : 'Going today'
   const parsed = new Date(`${date}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return prefix
   const formatted = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(parsed)
-  return `${prefix} · ${formatted}`
+  return `${prefix} - ${formatted}`
 }
 
 export const buildWeatherFactorCard = (factor, index) => {

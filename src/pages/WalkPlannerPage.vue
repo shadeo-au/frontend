@@ -53,15 +53,6 @@
             </span>
           </button>
 
-          <button v-if="showDemoStart" class="planner-choice-row planner-demo-row" type="button" @click="useDemoStart">
-            <span class="planner-choice-icon" aria-hidden="true">
-              <Icon icon="material-symbols:location-city-rounded" />
-            </span>
-            <span>
-              <strong>Use Melbourne demo location</strong>
-              <small>For local preview when browser location or place search is unavailable.</small>
-            </span>
-          </button>
         </div>
 
         <form v-if="startMode === 'manual'" class="planner-search-box" @submit.prevent="runStartSearch">
@@ -700,14 +691,11 @@ import timeIcon from '../assets/svg/time-icon.svg'
 import benchIcon from '../assets/svg/bench-icon.svg'
 import toiletIcon from '../assets/svg/toilet-icon.svg'
 import fountainIcon from '../assets/svg/drinking-fountain-icon.svg'
-import { demoRoutePayload, shouldUseDemoRouteFallback } from '../lib/demo-route.js'
 import {
   buildWeatherFactorCard,
   buildWeatherRequest,
-  demoStartPlace,
   formatTripDateLabel,
   normaliseTripDate,
-  shouldShowDemoStart,
   weatherSuitabilityEndpoint,
 } from '../lib/weather-suitability.js'
 
@@ -726,8 +714,6 @@ const ROUTE_SERVICE_URL = import.meta.env.VITE_ROUTE_SERVICE_URL || 'https://krd
 const PLACE_SEARCH_URL = import.meta.env.VITE_PLACE_SEARCH_URL || 'https://t0413oh804.execute-api.ap-southeast-2.amazonaws.com/default/place-search-service'
 const CANOPY_QUERY_URL = import.meta.env.VITE_CANOPY_QUERY_URL || 'https://ev1dboadg5.execute-api.ap-southeast-2.amazonaws.com/default/canopy-query-service'
 const DEBUG_PLANNER = import.meta.env.DEV || import.meta.env.VITE_DEBUG_PLANNER === 'true'
-const showDemoStart = shouldShowDemoStart(import.meta.env)
-const useDemoRouteFallback = shouldUseDemoRouteFallback(import.meta.env)
 
 const pmtilesProtocol = new Protocol()
 maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile)
@@ -1733,10 +1719,6 @@ const useMyLocation = async () => {
     isLocating.value = false
   }
 }
-const useDemoStart = async () => {
-  startMode.value = 'current'
-  await setSelectedStart(demoStartPlace())
-}
 const runStartSearch = async () => {
   if (!startQuery.value) return
   isSearchingStart.value = true
@@ -1915,18 +1897,8 @@ const requestPlan = async () => {
       highlightedRecommendationId.value = visibleRecommendations.value[0]?.id || ''
     }
   } catch (error) {
-    if (useDemoRouteFallback) {
-      const demoPayload = demoRoutePayload({
-        destinationType: selectedType.value || selectedSpecificDestination.value?.type || 'pharmacy',
-        preferShade: preferShade.value,
-      })
-      recommendations.value = buildRecommendationsFromPayload(demoPayload)
-      highlightedRecommendationId.value = visibleRecommendations.value[0]?.id || ''
-      planError.value = ''
-    } else {
-      planError.value = friendlyServiceErrorMessage()
-      recommendations.value = []
-    }
+    planError.value = friendlyServiceErrorMessage()
+    recommendations.value = []
   } finally {
     isLoadingPlan.value = false
   }
