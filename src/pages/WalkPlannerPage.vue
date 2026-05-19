@@ -1,5 +1,5 @@
 <template>
-  <main class="route-planner-page enhanced-planner" :class="{ 'is-route-view': isRouteView }">
+  <main class="route-planner-page enhanced-planner" :class="{ 'is-route-view': isRouteView, 'is-results-view': visibleStep === 3 && hasSearched }">
     <AppNav v-if="!isRouteView" />
     <div class="planner-scene" aria-hidden="true"></div>
     <div class="planner-scene-overlay" aria-hidden="true"></div>
@@ -206,7 +206,7 @@
         </article>
 
         <article v-else-if="visibleStep === 3 && hasSearched && recommendations.length" class="planner-card planner-recommendation-layout planner-step-pop">
-          <div class="planner-recommendation-list">
+          <div class="planner-recommendation-list" ref="recommendationListEl">
             <div class="planner-section-headline">
               <p>Results</p>
               <h3>Compare nearby options</h3>
@@ -226,6 +226,7 @@
               v-for="(item, index) in visibleRecommendations"
               :key="item.id"
               class="planner-destination-card"
+              :data-recommendation-id="item.id"
               :class="{ 'is-top-result': isMostRecommended(item), 'is-selected': highlightedRecommendationId === item.id }"
               @click="highlightRecommendation(item)"
             >
@@ -866,6 +867,7 @@ const result = reactive({
 const startSectionEl = ref(null)
 const destinationSectionEl = ref(null)
 const resultsSectionEl = ref(null)
+const recommendationListEl = ref(null)
 const miniMapEl = ref(null)
 const mapEl = ref(null)
 
@@ -875,10 +877,14 @@ let boundaryGeoJsonPromise = null
 let mapStylePromise = null
 let routeDashFrame = null
 let routeDashOffset = 0
+let lockedScrollY = 0
+let previousBodyScrollStyles = null
+let previousHtmlOverflow = ''
 const miniMapMarkers = []
 const routeMapMarkers = []
 
 const hasDestination = computed(() => !!result.destination)
+const isPlannerModalOpen = computed(() => isDetailOpen.value || isReadinessPromptOpen.value || isReadinessOpen.value)
 const selectedRecommendation = computed(() => recommendations.value.find((item) => item.id === highlightedRecommendationId.value) || null)
 const detailRecommendation = computed(() => selectedRecommendation.value)
 const RECOMMENDATION_SCORE_TOLERANCE = 5
@@ -1266,7 +1272,48 @@ const recommendationTypeIconUrl = (recommendation) => {
   return destinationTypes.find((item) => item.id === type)?.icon || selectedTypeIconUrl.value
 }
 const firstComfortNote = (recommendation) => recommendation.comfortNotes?.[0] || 'Comfort score based on walking time, shade, and nearby facilities'
-const scrollTo = (el) => el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+const scrollTo = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
+}
+const lockPageScroll = () => {
+  if (previousBodyScrollStyles || typeof window === 'undefined') return
+  const body = document.body
+  const html = document.documentElement
+  lockedScrollY = window.scrollY || html.scrollTop || 0
+  previousHtmlOverflow = html.style.overflow
+  previousBodyScrollStyles = {
+    position: body.style.position,
+    top: body.style.top,
+    left: body.style.left,
+    right: body.style.right,
+    width: body.style.width,
+    overflow: body.style.overflow
+  }
+  html.style.overflow = 'hidden'
+  body.style.position = 'fixed'
+  body.style.top = `-${lockedScrollY}px`
+  body.style.left = '0'
+  body.style.right = '0'
+  body.style.width = '100%'
+  body.style.overflow = 'hidden'
+}
+const unlockPageScroll = () => {
+  if (!previousBodyScrollStyles || typeof window === 'undefined') return
+  const body = document.body
+  const html = document.documentElement
+  html.style.overflow = previousHtmlOverflow
+  body.style.position = previousBodyScrollStyles.position
+  body.style.top = previousBodyScrollStyles.top
+  body.style.left = previousBodyScrollStyles.left
+  body.style.right = previousBodyScrollStyles.right
+  body.style.width = previousBodyScrollStyles.width
+  body.style.overflow = previousBodyScrollStyles.overflow
+  previousBodyScrollStyles = null
+  window.scrollTo(0, lockedScrollY)
+}
 const unlockStep = (id) => {
   maxReachableStep.value = Math.max(maxReachableStep.value, id)
 }
@@ -1275,6 +1322,7 @@ const lockAfterStep = (id) => {
 }
 const canNavigateToStep = (id) => id <= Math.min(maxReachableStep.value, 3)
 const showStep = async (id) => {
+  if (id !== 3) destroyMiniMap()
   visibleStep.value = id
   isReadinessOpen.value = false
   isRouteView.value = false
@@ -1991,6 +2039,12 @@ const openRecommendationDetails = (recommendation) => {
 const closeRecommendationDetails = () => {
   isDetailOpen.value = false
 }
+const bringRecommendationCardIntoView = (id) => {
+  if (!id || !recommendationListEl.value) return
+  const target = Array.from(recommendationListEl.value.querySelectorAll('[data-recommendation-id]'))
+    .find((el) => el.dataset.recommendationId === String(id))
+  target?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+}
 const backToRecommendations = async () => {
   applySelectedRecommendation(null)
   lockAfterStep(3)
@@ -2002,6 +2056,7 @@ const backToRecommendations = async () => {
 const highlightRecommendation = async (recommendation) => {
   highlightedRecommendationId.value = recommendation?.id || ''
   await nextTick()
+  bringRecommendationCardIntoView(recommendation?.id)
   drawMiniMap({ focusSelected: true })
 }
 
@@ -2347,6 +2402,24 @@ const addHtmlMarker = (targetMap, markers, lngLat, html, options = {}) => {
   if (options.className) el.classList.add(options.className)
   if (options.zIndex != null) el.style.zIndex = String(options.zIndex)
   el.innerHTML = html
+  if (options.onClick) {
+    el.classList.add('is-clickable')
+    el.setAttribute('role', 'button')
+    el.setAttribute('tabindex', '0')
+    el.addEventListener('pointerdown', (event) => {
+      event.stopPropagation()
+    })
+    el.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      options.onClick()
+    })
+    el.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      options.onClick()
+    })
+  }
   const marker = new maplibregl.Marker({
     element: el,
     anchor: options.anchor || 'bottom',
@@ -2610,24 +2683,29 @@ const drawMarkerSet = (targetMap, markers, lngLatBounds, includeFacilities = fal
   )
   lngLatBounds.push([start.lng, start.lat])
 
-  const destinations = (targetMap === miniMap && visibleRecommendations.value.length
+  const isRecommendationOverviewMap = targetMap === miniMap && visibleRecommendations.value.length > 0
+  const destinations = (isRecommendationOverviewMap
     ? visibleRecommendations.value
     : hasDestination.value ? [result] : recommendations.value)
     .map((item, index) => ({ item, index }))
   const orderedDestinations = [
-    ...destinations.filter(({ item }) => !(!hasDestination.value && highlightedRecommendationId.value === item.id)),
-    ...destinations.filter(({ item }) => !hasDestination.value && highlightedRecommendationId.value === item.id)
+    ...destinations.filter(({ item }) => !(isRecommendationOverviewMap && highlightedRecommendationId.value === item.id)),
+    ...destinations.filter(({ item }) => isRecommendationOverviewMap && highlightedRecommendationId.value === item.id)
   ]
   orderedDestinations.forEach(({ item, index }) => {
     const destination = item.destination
-    const isHighlighted = !hasDestination.value && highlightedRecommendationId.value === item.id
+    const isHighlighted = isRecommendationOverviewMap && highlightedRecommendationId.value === item.id
     const pinClass = isHighlighted ? 'rv-pin-dest is-highlighted' : 'rv-pin-dest'
-    const destHtml = hasDestination.value
+    const destHtml = !isRecommendationOverviewMap && hasDestination.value
       ? destinationMarkerHtml(selectedTypeLabel.value)
       : `<div class="${pinClass}">${index + 1}</div><div class="rv-pin-label rv-pin-label-dest">${destination.name}</div>`
     addHtmlMarker(targetMap, markers, [destination.lng, destination.lat], destHtml, {
       className: isHighlighted ? 'planner-marker-highlighted' : '',
-      zIndex: isHighlighted ? 80 : hasDestination.value ? 50 : 30 + index
+      zIndex: isHighlighted ? 80 : isRecommendationOverviewMap ? 30 + index : hasDestination.value ? 50 : 30 + index,
+      title: destination.name,
+      onClick: isRecommendationOverviewMap
+        ? () => highlightRecommendation(item)
+        : null
     })
     lngLatBounds.push([destination.lng, destination.lat])
   })
@@ -2645,8 +2723,12 @@ const drawMarkerSet = (targetMap, markers, lngLatBounds, includeFacilities = fal
   })
 }
 const ensureMiniMap = async () => {
-  if (miniMap || !miniMapEl.value) return
-  miniMap = await createPlannerMap(miniMapEl.value, { zoom: 13, onLoad: drawMiniMap })
+  if (!miniMapEl.value) return
+  if (miniMap && miniMap.getContainer?.() !== miniMapEl.value) {
+    destroyMiniMap()
+  }
+  if (miniMap) return
+  miniMap = await createPlannerMap(miniMapEl.value, { zoom: 13, scrollZoom: true, onLoad: drawMiniMap })
   miniMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 }
 const drawMiniMap = async (options = {}) => {
@@ -2826,6 +2908,17 @@ watch(recommendationSort, async () => {
   drawMiniMap()
 })
 watch(
+  isPlannerModalOpen,
+  (open) => {
+    if (open) {
+      lockPageScroll()
+    } else {
+      unlockPageScroll()
+    }
+  },
+  { flush: 'sync' }
+)
+watch(
   () => isReadinessOpen.value,
   async (open) => {
     if (open || isRouteView.value || !hasDestination.value) return
@@ -2848,6 +2941,7 @@ watch(
   }
 )
 onBeforeUnmount(() => {
+  unlockPageScroll()
   stopRouteDashAnimation()
   clearMarkers(routeMapMarkers)
   map?.remove()
@@ -2979,16 +3073,18 @@ onBeforeUnmount(() => {
 }
 
 .planner-flow-shell {
-  padding: calc(var(--nav-h) + 52px) 0 84px;
+  min-height: 100svh;
+  box-sizing: border-box;
+  padding: calc(var(--nav-h) + 36px) 0 52px;
 }
 
 .planner-flow-hero {
-  min-height: 28vh;
+  min-height: 16vh;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 16px;
-  padding: clamp(18px, 3.6vw, 46px) 0 54px;
+  gap: 12px;
+  padding: clamp(14px, 2.8vw, 34px) 0 32px;
   text-align: center;
 }
 
@@ -3007,7 +3103,7 @@ onBeforeUnmount(() => {
 .planner-flow-hero h1 {
   max-width: min(100%, 20ch);
   font-family: var(--font-body);
-  font-size: clamp(3rem, 4vw, 3.5rem);
+  font-size: clamp(2.65rem, 3.5vw, 3.2rem);
   font-weight: 950;
   line-height: var(--brand-lh-heading);
   letter-spacing: 0;
@@ -3802,6 +3898,175 @@ onBeforeUnmount(() => {
   min-height: 460px;
 }
 
+.route-planner-page.is-results-view .planner-flow-shell {
+  padding: calc(var(--nav-h) + 24px) 0 34px;
+}
+
+.route-planner-page.is-results-view .planner-flow-hero {
+  min-height: 0;
+  gap: 8px;
+  padding: 10px 0 18px;
+}
+
+.route-planner-page.is-results-view .planner-flow-hero h1 {
+  max-width: none;
+  font-size: clamp(2rem, 2.8vw, 2.55rem);
+  line-height: 1.08;
+}
+
+.route-planner-page.is-results-view .planner-recommendation-layout {
+  padding: clamp(14px, 1.7vw, 18px);
+  grid-template-columns: minmax(390px, 0.95fr) minmax(420px, 1.05fr);
+  gap: 14px;
+}
+
+.route-planner-page.is-results-view .planner-recommendation-list {
+  gap: 8px;
+}
+
+.route-planner-page.is-results-view .planner-section-headline {
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.route-planner-page.is-results-view .planner-section-headline h3 {
+  font-size: clamp(1.45rem, 2vw, 1.85rem);
+  line-height: 1.08;
+}
+
+.route-planner-page.is-results-view .planner-section-headline p,
+.route-planner-page.is-results-view .planner-section-headline > span,
+.route-planner-page.is-results-view .planner-result-toolbar label,
+.route-planner-page.is-results-view .planner-mini-map-head span {
+  font-size: 0.85rem;
+}
+
+.route-planner-page.is-results-view .planner-result-toolbar {
+  margin-bottom: 0;
+}
+
+.route-planner-page.is-results-view .planner-result-toolbar select {
+  min-height: 34px;
+  border-radius: 10px;
+  padding-left: 10px;
+  font-size: 0.9rem;
+}
+
+.route-planner-page.is-results-view .planner-destination-card {
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+}
+
+.route-planner-page.is-results-view .planner-destination-rank {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.route-planner-page.is-results-view .planner-destination-body {
+  column-gap: 10px;
+  row-gap: 4px;
+}
+
+.route-planner-page.is-results-view .planner-destination-topline,
+.route-planner-page.is-results-view .planner-destination-metrics,
+.route-planner-page.is-results-view .planner-tag-row,
+.route-planner-page.is-results-view .planner-result-actions {
+  gap: 7px;
+}
+
+.route-planner-page.is-results-view .planner-destination-main strong {
+  font-size: clamp(1.02rem, 1.25vw, 1.18rem);
+  line-height: 1.12;
+}
+
+.route-planner-page.is-results-view .planner-destination-address {
+  font-size: 0.86rem;
+  line-height: 1.28;
+}
+
+.route-planner-page.is-results-view .planner-rec-label,
+.route-planner-page.is-results-view .planner-score-badge,
+.route-planner-page.is-results-view .planner-tag-row em {
+  padding: 4px 8px;
+  font-size: 0.74rem;
+}
+
+.route-planner-page.is-results-view .planner-rec-label svg,
+.route-planner-page.is-results-view .planner-tag-row em svg {
+  width: 14px;
+  height: 14px;
+}
+
+.route-planner-page.is-results-view .planner-card-score > span:first-child {
+  width: 74px;
+  font-size: 0.62rem;
+}
+
+.route-planner-page.is-results-view .planner-score-badge-large {
+  width: 74px;
+  min-height: 50px;
+  padding: 6px 8px;
+  border-radius: 14px;
+}
+
+.route-planner-page.is-results-view .planner-score-badge-large strong {
+  font-size: 1.32rem;
+}
+
+.route-planner-page.is-results-view .planner-score-badge-large small {
+  font-size: 0.68rem;
+}
+
+.route-planner-page.is-results-view .planner-feature-chip-row em {
+  min-height: 26px;
+  padding: 4px 8px;
+}
+
+.route-planner-page.is-results-view .planner-feature-chip-row img,
+.route-planner-page.is-results-view .planner-destination-metrics img {
+  width: 15px;
+  height: 15px;
+}
+
+.route-planner-page.is-results-view .planner-destination-metrics span {
+  gap: 5px;
+  font-size: 0.86rem;
+}
+
+.route-planner-page.is-results-view .planner-view-details,
+.route-planner-page.is-results-view .planner-result-actions .btn {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+}
+
+.route-planner-page.is-results-view .planner-result-actions {
+  margin-top: 6px;
+}
+
+.route-planner-page.is-results-view .planner-mini-map-panel {
+  min-height: 0;
+  height: 100%;
+  border-radius: 18px;
+}
+
+.route-planner-page.is-results-view .planner-mini-map-head {
+  padding: 12px 14px;
+}
+
+.route-planner-page.is-results-view .planner-mini-map-head strong {
+  font-size: 0.98rem;
+}
+
+.route-planner-page.is-results-view .planner-mini-map {
+  min-height: 0;
+  height: 100%;
+}
+
 .planner-detail-backdrop {
   position: fixed;
   inset: 0;
@@ -3811,6 +4076,7 @@ onBeforeUnmount(() => {
   place-items: center;
   background: rgba(16, 19, 15, 0.28);
   backdrop-filter: blur(10px);
+  overscroll-behavior: contain;
 }
 
 .planner-detail-modal {
@@ -3818,6 +4084,7 @@ onBeforeUnmount(() => {
   width: min(100%, 720px);
   max-height: min(90vh, 820px);
   overflow: auto;
+  overscroll-behavior: contain;
   padding: clamp(22px, 4vw, 34px);
 }
 
@@ -4061,6 +4328,7 @@ onBeforeUnmount(() => {
   place-items: center;
   background: rgba(16, 19, 15, 0.3);
   backdrop-filter: blur(12px);
+  overscroll-behavior: contain;
 }
 
 .planner-readiness-modal {
@@ -4068,6 +4336,7 @@ onBeforeUnmount(() => {
   width: min(100%, 880px);
   max-height: min(92vh, 980px);
   overflow: auto;
+  overscroll-behavior: contain;
   padding: clamp(22px, 4vw, 36px);
 }
 
@@ -4834,6 +5103,21 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
+.planner-maplibre-marker.is-clickable {
+  cursor: pointer;
+}
+
+.planner-maplibre-marker.is-clickable:hover .rv-pin-dest,
+.planner-maplibre-marker.is-clickable:focus-visible .rv-pin-dest {
+  transform: translateY(-3px) scale(1.04);
+}
+
+.planner-maplibre-marker.is-clickable:focus-visible {
+  outline: 3px solid rgba(38, 48, 40, 0.48);
+  outline-offset: 5px;
+  border-radius: 999px;
+}
+
 .planner-marker-highlighted {
   z-index: 80;
 }
@@ -4966,6 +5250,16 @@ onBeforeUnmount(() => {
 
   .planner-mini-map {
     min-height: 360px;
+  }
+
+  .route-planner-page.is-results-view .planner-mini-map-panel {
+    min-height: 360px;
+    height: auto;
+  }
+
+  .route-planner-page.is-results-view .planner-mini-map {
+    min-height: 300px;
+    height: auto;
   }
 
   .planner-route-shell {
