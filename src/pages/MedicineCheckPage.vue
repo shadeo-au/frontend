@@ -4,6 +4,7 @@ import AppNav from '@/components/AppNav.vue';
 import SectionKicker from '@/components/SectionKicker.vue';
 import ClayCard from '@/components/ClayCard.vue';
 import BrandWatermark from '@/components/BrandWatermark.vue';
+import AppFooter from '@/components/AppFooter.vue';
 import MedicationPicker from '@/components/medicine/MedicationPicker.vue';
 import MedicationRiskPanel from '@/components/medicine/MedicationRiskPanel.vue';
 import { DISCLAIMER, SOURCES } from '@/lib/selfcheck/medication-data';
@@ -129,18 +130,13 @@ const sourceList = Object.values(SOURCES);
       </section>
 
       <!-- Footer -->
-      <footer class="mc-footer">
-        <div class="mc-section__inner">
-          <p class="mc-footer__safety">
-            <strong>Safety:</strong> If you feel dizzy, confused, weak, very thirsty, or unwell during
-            hot weather, seek medical help. In an emergency, call <strong>000</strong>.
-          </p>
-          <p class="mc-footer__privacy">
-            The medicines you tick are stored on this device only. They are not sent anywhere and are
-            not linked to you. You can clear them at any time using the "Clear all" button above.
-          </p>
-        </div>
-      </footer>
+      <AppFooter>
+        <p>
+          <strong>Your privacy:</strong> The medicines you tick are stored on this device
+          only. They are not sent anywhere and are not linked to you. You can clear them at
+          any time using the "Clear all" button.
+        </p>
+      </AppFooter>
     </main>
   </div>
 </template>
@@ -294,29 +290,7 @@ const sourceList = Object.values(SOURCES);
   text-decoration: underline;
 }
 
-.mc-footer {
-  background: var(--brand-ink-soft);
-  color: var(--brand-paper);
-  padding: clamp(36px, 5vw, 64px) 0;
-}
-.mc-footer .mc-section__inner { gap: 12px; }
-.mc-footer p {
-  color: rgba(248, 241, 227, 0.85);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.6;
-  max-width: 88ch;
-}
-.mc-footer strong {
-  color: var(--brand-paper-white);
-  font-weight: 900;
-}
-.mc-footer__safety {
-  padding: 16px 22px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(248, 241, 227, 0.18);
-}
+/* Footer styles now live in the shared AppFooter.vue component. */
 
 @media (max-width: 980px) {
   .mc-grid { grid-template-columns: 1fr; }

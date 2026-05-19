@@ -7,10 +7,3 @@ declare module '*.vue' {
   export default component
 }
 
-interface ImportMetaEnv {
-  readonly VITE_GATE_HASH: string
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv
-}

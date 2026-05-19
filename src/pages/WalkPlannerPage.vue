@@ -668,6 +668,8 @@
         <div ref="mapEl" class="planner-route-map"></div>
       </section>
     </section>
+
+    <AppFooter v-if="!isRouteView" />
   </main>
 </template>
 
@@ -677,6 +679,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Protocol } from 'pmtiles'
 import AppNav from '../components/AppNav.vue'
+import AppFooter from '../components/AppFooter.vue'
 import { Icon } from '@iconify/vue'
 import pharmacyIcon from '../assets/svg/pharmacy.svg'
 import groceryIcon from '../assets/svg/grocery.svg'
