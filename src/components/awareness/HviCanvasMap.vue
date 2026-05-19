@@ -1202,8 +1202,9 @@ SHVI raw = (Exposure + Senior sensitivity - Adaptive capacity) / 3</code>
   flex-direction: column;
   gap: 12px;
   height: clamp(460px, 72vh, 720px);
-  overflow-y: hidden;
+  overflow-y: auto;
   overflow-x: clip;          /* explicit: no horizontal scrollbar */
+  scrollbar-gutter: stable;
   padding: clamp(18px, 2vw, 22px);
   border: 1px solid var(--brand-line);
   border-radius: 24px;
@@ -1510,18 +1511,30 @@ SHVI raw = (Exposure + Senior sensitivity - Adaptive capacity) / 3</code>
 
 .hvi-map__factor-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 2px 8px;
   color: var(--brand-ink-muted);
   font-size: 0.88rem;
   font-weight: 750;
 }
 
+.hvi-map__factor-head > span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .hvi-map__factor-head strong {
+  flex: 0 0 auto;
+  margin-left: auto;
   color: var(--brand-ink);
   font-size: 0.88rem;
   font-weight: 900;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .hvi-map__bar {
@@ -1621,25 +1634,29 @@ SHVI raw = (Exposure + Senior sensitivity - Adaptive capacity) / 3</code>
 
 .hvi-map__actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   align-items: stretch;
   margin-top: 2px;
 }
 
 .hvi-map__details-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 6px;
+  padding: 0 8px 0 12px;
   border: 1px solid rgba(98, 133, 107, 0.3);
   border-radius: 12px;
   background: rgba(228, 248, 213, 0.42);
   color: var(--brand-ink-soft);
   font-family: inherit;
-  font-size: 0.94rem;
+  font-size: 0.9rem;
   font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 180ms ease, transform 180ms ease;
 }
@@ -1949,26 +1966,28 @@ SHVI raw = (Exposure + Senior sensitivity - Adaptive capacity) / 3</code>
 }
 
 .hvi-map__source {
-  width: fit-content;
+  width: 100%;
   margin-top: 0;
 }
 
 .hvi-map__source-button {
-  min-width: min(100%, 170px);
+  width: 100%;
+  min-width: 0;
   min-height: 46px;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 8px 0 18px;
+  gap: 6px;
+  padding: 0 6px 0 12px;
   border: 1px solid transparent;
   border-radius: 22px;
   background: var(--brand-lime);
   color: var(--brand-ink);
   box-shadow: var(--brand-shadow-nav);
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 900;
   letter-spacing: 0.01em;
+  white-space: nowrap;
   transition:
     border-color var(--d-fast) ease,
     background var(--d-fast) ease,
@@ -1977,15 +1996,15 @@ SHVI raw = (Exposure + Senior sensitivity - Adaptive capacity) / 3</code>
 }
 
 .hvi-map__source-button i {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.86);
   color: var(--brand-ink);
-  font-size: 1.18rem;
+  font-size: 1.06rem;
   font-style: normal;
   font-weight: 950;
   line-height: 1;

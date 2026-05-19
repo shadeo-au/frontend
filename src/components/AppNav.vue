@@ -34,11 +34,11 @@ const items: NavItem[] = [
   { kind: 'link', label: 'Awareness Map', href: '/awareness', path: '/awareness' },
   {
     kind: 'group',
-    label: 'Self-Check',
+    label: 'Heat Check',
     href: '/self-check',
     matchPaths: ['/self-check', '/medicine-check'],
     children: [
-      { kind: 'link', label: 'Self-Check', href: '/self-check', path: '/self-check' },
+      { kind: 'link', label: 'Heat Check', href: '/self-check', path: '/self-check' },
       { kind: 'link', label: 'Medicine Check', href: '/medicine-check', path: '/medicine-check' },
     ],
   },

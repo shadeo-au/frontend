@@ -9,7 +9,7 @@ const footerLinks = [
   { label: 'Why', href: '/why' },
   { label: 'Walk Planner', href: '/walk-planner' },
   { label: 'Awareness Map', href: '/awareness' },
-  { label: 'Self-Check', href: '/self-check' },
+  { label: 'Heat Check', href: '/self-check' },
   { label: 'Medicine Check', href: '/medicine-check' },
 ];
 </script>
