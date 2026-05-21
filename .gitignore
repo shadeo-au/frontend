@@ -58,3 +58,6 @@ backend/backend/data/footpath-steepness.geojson
 
 # Tooling artefacts not part of the project
 /skills-lock.json
+
+/database
+/backend-artifacts
